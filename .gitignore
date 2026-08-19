@@ -1,0 +1,7 @@
+build/
+*.gb
+*.gbc
+*.o
+*.map
+*.lst
+*.sym
