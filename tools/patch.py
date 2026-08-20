@@ -1,4 +1,10 @@
-"""Apply and analyse UPS and BPS patches.
+"""Apply, create and analyse UPS and BPS patches.
+
+    python3 tools/patch.py tetrisgym.bps "Tetris (World) (Rev A).gb"
+
+Applies a patch to a ROM you supply and writes the result beside it. This
+exists so that using a release needs nothing but Python 3 - the same promise
+the build makes.
 
 The Game Boy Tetris community distributes its ROM hacks as UPS/BPS patches
 against Tetris (World) (Rev A). Since `build.py --original` reproduces that ROM
@@ -11,6 +17,8 @@ See docs/research.md section 7.
 
 import binascii
 import struct
+import sys
+from pathlib import Path
 
 
 class PatchError(Exception):
@@ -128,3 +136,115 @@ def apply(source: bytes, patch: bytes):
     if patch[:4] == b"BPS1":
         return apply_bps(source, patch)[0]
     raise PatchError(f"unknown patch format {patch[:4]!r}")
+
+
+# --- creating BPS patches --------------------------------------------------
+#
+# Releases are a patch and nothing else: the user brings their own ROM. See
+# CLAUDE.md principle 10.
+
+def _write_vuint(out: bytearray, value: int):
+    while True:
+        x = value & 0x7F
+        value >>= 7
+        if value == 0:
+            out.append(0x80 | x)
+            return
+        out.append(x)
+        value -= 1
+
+
+def _write_svuint(out: bytearray, value: int):
+    _write_vuint(out, (abs(value) << 1) | (1 if value < 0 else 0))
+
+
+def create_bps(source: bytes, target: bytes, metadata: bytes = b"") -> bytes:
+    """Encode a BPS patch turning `source` into `target`.
+
+    Deliberately simple: runs that already match the source cost nothing, runs
+    of a repeated byte become a self-referencing copy (which is how the 32 KB of
+    $FF padding in the new banks all but disappears), everything else is a
+    literal. A real delta compressor would do better; the output of this one is
+    small enough that the difference does not matter.
+    """
+    MIN_RUN = 4
+    out = bytearray(b"BPS1")
+    _write_vuint(out, len(source))
+    _write_vuint(out, len(target))
+    _write_vuint(out, len(metadata))
+    out += metadata
+
+    def emit(action, length, literal=b""):
+        _write_vuint(out, ((length - 1) << 2) | action)
+        out.extend(literal)
+
+    i, n, tgt_rel, pending = 0, len(target), 0, bytearray()
+
+    def flush_literal():
+        if pending:
+            emit(1, len(pending), bytes(pending))
+            pending.clear()
+
+    while i < n:
+        # 1. Identical to the source at the same offset: free.
+        run = 0
+        while (i + run < n and i + run < len(source)
+               and target[i + run] == source[i + run]):
+            run += 1
+        if run >= MIN_RUN:
+            flush_literal()
+            emit(0, run)
+            i += run
+            continue
+
+        # 2. A repeated byte: point one byte back into the output and let the
+        #    copy read what it is writing.
+        run = 1
+        while i + run < n and target[i + run] == target[i]:
+            run += 1
+        if i > 0 and target[i] == target[i - 1] and run >= MIN_RUN:
+            flush_literal()
+            _write_vuint(out, ((run - 1) << 2) | 3)
+            _write_svuint(out, (i - 1) - tgt_rel)
+            tgt_rel = (i - 1) + run
+            i += run
+            continue
+
+        pending.append(target[i])
+        i += 1
+
+    flush_literal()
+    out += struct.pack("<II", binascii.crc32(source) & 0xFFFFFFFF,
+                       binascii.crc32(target) & 0xFFFFFFFF)
+    out += struct.pack("<I", binascii.crc32(bytes(out)) & 0xFFFFFFFF)
+    return bytes(out)
+
+
+def _main(argv):
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Apply a UPS or BPS patch to a ROM.")
+    ap.add_argument("patch", help="the .bps or .ups file")
+    ap.add_argument("rom", help="your own copy of Tetris (World) (Rev A)")
+    ap.add_argument("-o", "--out", help="output file (default: alongside the patch)")
+    args = ap.parse_args(argv)
+
+    patch_path, rom_path = Path(args.patch), Path(args.rom)
+    out = Path(args.out) if args.out else patch_path.with_suffix(".gb")
+
+    try:
+        result = apply(rom_path.read_bytes(), patch_path.read_bytes())
+    except PatchError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        if "source mismatch" in str(exc):
+            print("This patch is for Tetris (World) (Rev A), md5 "
+                  "982ed5d2b12a0377eb14bcdc4123744e.", file=sys.stderr)
+        return 1
+
+    out.write_bytes(result)
+    print(f"wrote {out}  ({len(result)} bytes)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main(sys.argv[1:]))

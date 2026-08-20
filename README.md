@@ -47,6 +47,55 @@ This is deliberately **not** a modernisation. No hold, no hard drop, no ghost pi
 [Tetris — Rosy Retrospection](https://www.romhacking.net/hacks/5813/) already does that well, and
 does not need competition.
 
+## Play it
+
+You need your own copy of **`Tetris (World) (Rev A)`** — md5
+`982ed5d2b12a0377eb14bcdc4123744e`. This project never distributes ROM data.
+
+Download `tetrisgym.bps` from
+[Releases](https://github.com/Giovanniclini/tetris-gym-gb/releases), then apply it:
+
+```
+python3 tools/patch.py tetrisgym.bps "Tetris (World) (Rev A).gb"
+```
+
+That writes `tetrisgym.gb`. Any BPS patcher works too (Floating IPS, beat, Rom Patcher JS);
+the script is here so you need nothing but Python 3.
+
+Or build it from source — no ROM required, since the ROM is rebuilt from the disassembly:
+
+```
+git clone https://github.com/Giovanniclini/tetris-gym-gb
+cd tetris-gym-gb
+python3 build.py          # -> build/tetrisgym.gb
+```
+
+Run it in [SameBoy](https://sameboy.github.io/), BGB, Emulicious or mGBA, or copy it to an
+EverDrive GB or EZ-Flash Junior. **In mGBA, set *Settings → Game Boy → Game Boy model →
+Game Boy Color*** or the screen is greyscale — see [below](#known-quirk-greyscale-in-some-emulators).
+
+### Controls
+
+Everything the original does still works. What the Gym adds:
+
+| Where | Press | Does |
+| --- | --- | --- |
+| Level select, grid cell `9` | `Right` | into the level picker |
+| Level picker | `Up` / `Down` | choose `0`–`9` then `A`–`M` (`A` = 10, `M` = 22) |
+| Level picker | `Left` | back to the grid |
+| Level picker | `Right` | on to the seed |
+| Seed digits | `Up` / `Down` | change a hex digit |
+| Seed digits | `Left` / `Right` | move between the four digits; `Left` off the first goes back |
+| Level select | `Select` | toggle hearts (+10 speed), shown beside `LEVEL` |
+| Any time in a game | `A`+`B`+`Select`+`Start` | restart the same drill instantly |
+
+A seed of `0000` means **no seed** — pieces come from the hardware timer, exactly as the
+original does. Any other seed gives the same pieces every time, and the same pieces as the
+community's existing seeded ROM, so seeds are shareable.
+
+Hearts are unavailable above level 20: the original computes heart speed as
+`min(level + 10, 20)`, which past 20 clamps *downward* and would make the game slower.
+
 ## What it does
 
 **Working today**
@@ -74,23 +123,15 @@ VS garbage. Ranked from community evidence in
 | **Toolchain** | RGBDS v0.6.1, downloaded and SHA-256-verified into `build/`. No system-wide installs. |
 | **Build** | `python3 build.py` — Python 3 stdlib only. No `make`, no `gcc`. |
 | **Cartridge** | MBC1, 128 KB ROM, 8 KB battery SRAM. The original 32 KB ROM has only ~400 free bytes. |
-| **Distribution** | **BPS patch only.** You supply your own ROM. |
+| **Distribution** | **BPS patch only.** You supply your own ROM. `python3 build.py --patch` builds it. |
 
 Full reasoning in [`docs/architecture.md`](docs/architecture.md) and
 [`docs/research.md`](docs/research.md).
 
-## Requirements
+## Why real hardware needs a flash cart
 
-**You must supply your own Game Boy Tetris ROM.** This repository does not, and will not, distribute
-ROM data. Releases contain a BPS patch you apply to your own legally obtained copy of
-`Tetris (World) (Rev A)`.
-
-**On real hardware you need a flash cart** — an [EverDrive
-GB](https://krikzz.com/our-products/cartridges/edgbx7.html) or an EZ-Flash Junior, which load `.gb`
-files from an SD card. In emulation, [SameBoy](https://sameboy.github.io/), BGB, Emulicious and
-mGBA all work with no extra hardware.
-
-*This is not a restriction this project introduces.* A retail Game Boy Tetris cartridge contains
+An [EverDrive GB](https://krikzz.com/our-products/cartridges/edgbx7.html) or an EZ-Flash Junior,
+which load `.gb` files from an SD card. *This is not a restriction this project introduces.* A retail Game Boy Tetris cartridge contains
 **mask ROM** — etched during chip fabrication and physically unwritable. A Game Genie can patch
 cartridge reads at runtime on a genuine cart, but only three codes at a time, which is enough for a
 level-start tweak and nowhere near enough for a Gym. Anything larger needs a flash cart.
@@ -124,7 +165,8 @@ In mGBA: *Settings → Game Boy → Game Boy model → **Game Boy Color***.
 
 ## Contributing
 
-The project is at Milestone 0. The most valuable contributions right now are **not** code:
+Current status is in [`docs/roadmap.md`](docs/roadmap.md). The most valuable contributions
+right now are **not** code:
 
 * **Talk to the GBTetris Discord.** First contact already corrected two ranking errors and surfaced
   the community's actual blocker (SPS). The open questions are listed in
