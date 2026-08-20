@@ -3,7 +3,9 @@
 **A TetrisGYM-style training and practice ROM for the original Nintendo Game Boy Tetris (1989).**
 
 > **Status:** see [`docs/roadmap.md`](docs/roadmap.md).
-> Working today: level select up to M, hearts, instant restart and SPS.
+> Working today: level select up to M, hearts, instant restart, SPS and per-level high scores.
+> [**Get v0.1.0**](https://github.com/Giovanniclini/tetris-gym-gb/releases) — or see
+> [Play it](#play-it).
 
 ---
 
