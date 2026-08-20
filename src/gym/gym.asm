@@ -46,10 +46,10 @@ SECTION "Gym State", WRAM0[$D800]
 wGymState::
 
 ; Level picker, shown in a single cell to the right of the original 0-9 grid.
-wGymPickerActive:: db        ; non-zero while the picker has focus
+wGymFocus::        db        ; 0 grid, 1 level, 2-5 the four seed digits
 wGymPickerLevel::  db        ; 0-22, shown as 0-9 then A-M
-wGymPickerBlink::  db        ; frame counter for the focus blink
-wGymPickerDrawn::  db        ; what we last wrote, to avoid needless VRAM writes
+wGymBlinkTimer::   db        ; frame counter for the focus blink
+wGymBlinkPhase::   db        ; current blink phase
 
 ; The original's init copies the whole layout back over the screen after our
 ; init runs, so anything we draw during init is erased. Repaint a frame later.
@@ -66,7 +66,13 @@ wGymRestarting:: db
 wGymRngLo:: db
 wGymRngHi:: db
 
-	ds 1016
+; The seed as configured on the menu, copied into the LFSR at the start of every
+; game. Kept separate because the LFSR state advances during play, and a restart
+; must repeat the sequence rather than continue it.
+wGymSeedLo:: db
+wGymSeedHi:: db
+
+	ds 1014
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -105,6 +111,8 @@ GymDispatch::
 	jr   z, .levelEnded
 	cp   GS_ENTERING_HIGH_SCORE
 	jr   z, .nameEntry
+	cp   GS_IN_GAME_INIT
+	jr   z, .gameInit
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
 
@@ -153,57 +161,77 @@ GymDispatch::
 	ld   hl, GameState15_EnteringHighScore
 	ret
 
+; Every game begins here, whether from the menu or an instant restart, so this
+; is the one place to load the configured seed into the LFSR. A restart must
+; repeat the sequence, not continue it.
+.gameInit:
+	call GymArmSeed
+	ld   hl, GameState0a_InGameInit
+	ret
+
 
 
 
 ; ---------------------------------------------------------------------------
-; Level picker
+; Level picker and seed entry
 ;
-; The original 0-9 grid is left completely alone - same tiles, same cursor,
-; same movement. All the Gym adds is one cell to the right of it showing a
-; level, changed with Left and Right.
+; The original 0-9 grid is left completely alone - same tiles, same cursor, same
+; movement. The Gym adds two fields in the blank strip to its right:
 ;
-; Pressing Right on cell 9 gives the picker focus; the original ignores that
-; press (`cp $09 / jr z`), so nothing needs suppressing to reach it. Pressing
-; Left at level 0 hands focus back to cell 9.
+;        cols 15-18
+;   row  6      .  L  .  .      level, 0-9 then A-M
+;   row  9      S  E  E  D
+;   row 10      A  C  E  1      seed, four hex digits
 ;
-; The picker cell's tile is simply the level number: the font puts 0-9 at
-; $00-$09 and A-M at $0A-$16, so tile == level for every level we support.
+; Focus moves in a chain: grid -> level -> the four seed digits. Right on grid
+; cell 9 enters the level field (a press the original ignores); Down from the
+; level field drops into the seed. The focused field blinks.
+;
+; A seed of $0000 means "no seed", so SPS is off and pieces come from rDIV as
+; they always did - which is genuinely random, so there is nothing to randomise.
 ; ---------------------------------------------------------------------------
 
 DEF PICKER_CELL   EQU _SCRN0 + 6 * 32 + 16
+DEF SEED_LABEL    EQU _SCRN0 + 9 * 32 + 15
+DEF SEED_CELL     EQU _SCRN0 + 10 * 32 + 15
 DEF HEART_CELL    EQU _SCRN0 + 4 * 32 + 14
 DEF TILE_HEART    EQU $27
 DEF TILE_FRAME    EQU $2c       ; what the original draws in the heart cell
-DEF GRID_LAST     EQU 9       ; bottom-right cell of the original grid
-DEF PICKER_BLANK  EQU $2f
+DEF TILE_BLANK    EQU $2f
+DEF GRID_LAST     EQU 9
+
+DEF FOCUS_GRID    EQU 0
+DEF FOCUS_LEVEL   EQU 1
+DEF FOCUS_SEED    EQU 2         ; .. FOCUS_SEED+3, leftmost digit first
+
+; Font tiles. The game's charmap puts A-Z at $0A-$23; it lives in includes.s,
+; which this file does not include, so the letters we need are spelled out.
+DEF TILE_D        EQU $0d
+DEF TILE_E        EQU $0e
+DEF TILE_S        EQU $1c
 
 
 GymLevelSelectInit::
 ; hATypeLevel may hold a level above the grid, set last time a game started.
-; Give the picker focus in that case, otherwise leave the grid in charge.
 	ldh  a, [hATypeLevel]
 	cp   GRID_LAST + 1
-	jr   nc, .abovegrid
+	jr   nc, .aboveGrid
 
-	xor  a
-	ld   [wGymPickerActive], a
+	ld   a, FOCUS_GRID
+	ld   [wGymFocus], a
 	ld   a, GRID_LAST + 1           ; a sensible first value to offer
-	jr   .storePicker
+	jr   .storeLevel
 
-.abovegrid:
+.aboveGrid:
 	ld   b, a
-	ld   a, 1
-	ld   [wGymPickerActive], a
+	ld   a, FOCUS_LEVEL
+	ld   [wGymFocus], a
 	ld   a, GRID_LAST
 	ldh  [hATypeLevel], a           ; keep the grid cursor somewhere valid
 	ld   a, b
 
-.storePicker:
+.storeLevel:
 	ld   [wGymPickerLevel], a
-
-	ld   a, $ff
-	ld   [wGymPickerDrawn], a       ; force the first paint
 	ld   a, 1
 	ld   [wGymRedrawPending], a
 	ret
@@ -229,7 +257,7 @@ GymLevelSelectMain::
 	xor  a
 	ld   [wGymRedrawPending], a
 	call GymDrawHearts
-	call GymDrawPicker
+	call GymPaintFields
 
 .readInput:
 	ldh  a, [hButtonsPressed]
@@ -252,74 +280,114 @@ GymLevelSelectMain::
 	call GymDrawHearts
 
 .afterSelect:
-	ld   a, [wGymPickerActive]
+	ld   a, [wGymFocus]
 	and  a
-	jr   nz, .picker
+	jr   z, .gridFocus
+	cp   FOCUS_LEVEL
+	jr   z, .levelFocus
+	jr   .seedFocus
 
-; --- grid has focus: the only thing we add is Right on the last cell ---
+; --- the grid has focus: the only thing we add is Right on the last cell ---
+.gridFocus:
 	bit  PADB_RIGHT, c
 	ret  z
 	ldh  a, [hATypeLevel]
 	cp   GRID_LAST
 	ret  nz
-
-	ld   a, 1
-	ld   [wGymPickerActive], a
+	ld   a, FOCUS_LEVEL
+	ld   [wGymFocus], a
 	jr   .consume
 
-; --- picker has focus ---
-.picker:
-	bit  PADB_RIGHT, c
-	jr   z, .checkLeft
+; --- the level field has focus ---
+.levelFocus:
+; Up has nowhere to go from here, but must still be swallowed: the original
+; would otherwise move the grid cursor underneath us, and Left from this field
+; returns focus to wherever it ended up.
+	bit  PADB_UP, c
+	jr   nz, .consume
 
+	bit  PADB_DOWN, c
+	jr   z, .levelNotDown
+	ld   a, FOCUS_SEED              ; drop into the seed, leftmost digit
+	ld   [wGymFocus], a
+	jr   .consume
+
+.levelNotDown:
+	bit  PADB_RIGHT, c
+	jr   z, .levelNotRight
 	ld   a, [wGymPickerLevel]
 	cp   MAX_LEVEL
-	jr   nc, .consume               ; already at M
+	jr   nc, .consume
 	inc  a
 	ld   [wGymPickerLevel], a
 	jr   .consume
 
-.checkLeft:
+.levelNotRight:
 	bit  PADB_LEFT, c
-	jr   z, .swallowVertical
-
+	ret  z
 	ld   a, [wGymPickerLevel]
 	and  a
-	jr   nz, .decLevel
+	jr   nz, .levelDec
 
-; at level 0: hand focus back to the grid
-	ld   [wGymPickerActive], a      ; a is already 0
+	ld   [wGymFocus], a             ; a is 0 = FOCUS_GRID
 	call GymShowGridCursor
 	jr   .consume
 
-.decLevel:
+.levelDec:
 	dec  a
 	ld   [wGymPickerLevel], a
 	jr   .consume
 
-; Up and Down would move the grid cursor underneath the picker, so ignore them
-; while the picker has focus.
-.swallowVertical:
+; --- a seed digit has focus ---
+.seedFocus:
 	bit  PADB_UP, c
-	jr   nz, .consumeQuietly
-	bit  PADB_DOWN, c
-	ret  z
+	jr   z, .seedNotUp
+	ld   b, 1
+	call GymAdjustSeedNibble
+	jr   .consume
 
-.consumeQuietly:
-	ldh  a, [hButtonsPressed]
-	res  PADB_UP, a
-	res  PADB_DOWN, a
-	ldh  [hButtonsPressed], a
-	ret
+.seedNotUp:
+	bit  PADB_DOWN, c
+	jr   z, .seedNotDown
+	ld   b, -1
+	call GymAdjustSeedNibble
+	jr   .consume
+
+.seedNotDown:
+	bit  PADB_RIGHT, c
+	jr   z, .seedNotRight
+	ld   a, [wGymFocus]
+	cp   FOCUS_SEED + 3
+	jr   nc, .consume               ; already on the last digit
+	inc  a
+	ld   [wGymFocus], a
+	jr   .consume
+
+.seedNotRight:
+	bit  PADB_LEFT, c
+	ret  z
+	ld   a, [wGymFocus]
+	cp   FOCUS_SEED + 1
+	jr   nc, .seedLeftWithin
+
+	ld   a, FOCUS_LEVEL             ; back up to the level field
+	ld   [wGymFocus], a
+	jr   .consume
+
+.seedLeftWithin:
+	dec  a
+	ld   [wGymFocus], a
 
 .consume:
 	ldh  a, [hButtonsPressed]
 	res  PADB_LEFT, a
 	res  PADB_RIGHT, a
+	res  PADB_UP, a
+	res  PADB_DOWN, a
 	ldh  [hButtonsPressed], a
 	ld   a, SND_MOVING_SELECTION
 	ld   [wSquareSoundToPlay], a
-	jp   GymDrawPicker
+	jp   GymPaintFields
 
 
 ; Runs after the original handler.
@@ -328,25 +396,20 @@ GymLevelSelectPost::
 	cp   GS_A_TYPE_SELECTION_MAIN
 	jr   nz, .leavingScreen
 
-	ld   a, [wGymPickerActive]
+	ld   a, [wGymFocus]
 	and  a
 	ret  z                          ; grid has focus: nothing to correct
 
 ; Hide the grid cursor - it draws the character for hATypeLevel, which is not
-; what the picker is showing - and blink the picker cell instead, at the
-; original's own 16-frame cadence.
-; The original flashes this sprite by XOR-ing its hidden bit and then copying
-; the specs into OAM. Setting the bit here is not enough on its own - the copy
-; has already happened - so push the hidden state through as well, or the grid
-; cursor blinks on screen next to the picker.
+; what these fields show - and push that through to OAM, because the original
+; has already copied the specs by the time we run.
 	ld   a, SPRITE_SPEC_HIDDEN
 	ld   [wSpriteSpecs + SPR_SPEC_Hidden], a
 	call Copy2SpriteSpecsToShadowOam
 
-; Hearts are min(level + 10, 20). Above level 20 that ceiling clamps *downward*
-; and makes the game slower, so hearts are simply turned off up there rather
-; than changing the original formula, which normal heart games rely on.
-; See docs/existing-hacks.md 3.2b.
+; Hearts are min(level + 10, 20). Above level 20 that ceiling clamps downward
+; and makes the game slower, so hearts are turned off up there rather than
+; changing the original formula. See docs/existing-hacks.md 3.2b.
 	ld   a, [wGymPickerLevel]
 	cp   21
 	jr   c, .blink
@@ -358,19 +421,25 @@ GymLevelSelectPost::
 	call GymDrawHearts
 
 .blink:
-	ld   hl, wGymPickerBlink
+	ld   hl, wGymBlinkTimer
 	inc  [hl]
 	ld   a, [hl]
 	and  $10
-	jr   z, GymDrawPickerBlank
-	jr   GymDrawPicker
-
-; The original has handed over, so hATypeLevel stops being a grid index and
-; becomes the level the game will start on.
-.leavingScreen:
-	ld   a, [wGymPickerActive]
-	and  a
+	ld   b, a
+	ld   a, [wGymBlinkPhase]
+	cp   b
 	ret  z
+	ld   a, b
+	ld   [wGymBlinkPhase], a
+	jp   GymPaintFields
+
+; The original has handed over - to the game, or back a screen. hATypeLevel has
+; been holding a grid index so the original cursor code kept working; now that
+; nothing else reads it as an index, fold in the level field.
+.leavingScreen:
+	ld   a, [wGymFocus]
+	and  a
+	ret  z                          ; grid has focus: the cursor is the level
 	ld   a, [wGymPickerLevel]
 	ldh  [hATypeLevel], a
 	ret
@@ -386,30 +455,135 @@ GymShowGridCursor::
 	jp   Copy2SpriteSpecsToShadowOam
 
 
-GymDrawPickerBlank::
-	ld   a, PICKER_BLANK
-	jr   GymDrawPickerTile
+; Add B (1 or -1) to the nibble the focus is on, wrapping 0-F.
+GymAdjustSeedNibble::
+	ld   a, [wGymFocus]
+	sub  FOCUS_SEED
+	ld   c, a                       ; c = digit index 0-3
 
-GymDrawPicker::
-	ld   a, [wGymPickerLevel]
+	call GymReadSeedNibble
+	add  b
+	and  $0f
+	ld   d, a                       ; d = new nibble
 
-; Paint one tile into the picker cell, skipping the write when it is already
-; there. Waits for VBlank rather than queueing - it is a single byte.
-GymDrawPickerTile::
-	ld   b, a
-	ld   a, [wGymPickerDrawn]
-	cp   b
-	ret  z
-	ld   a, b
-	ld   [wGymPickerDrawn], a
+; rebuild the byte the digit lives in
+	ld   a, c
+	cp   2
+	jr   c, .highByte
 
+	ld   hl, wGymSeedLo
+	jr   .haveByte
+
+.highByte:
+	ld   hl, wGymSeedHi
+
+.haveByte:
+	ld   a, c
+	and  1                          ; 0 = upper nibble, 1 = lower
+	jr   nz, .lowerNibble
+
+	ld   a, [hl]
+	and  $0f
+	swap d
+	or   d
+	ld   [hl], a
+	ret
+
+.lowerNibble:
+	ld   a, [hl]
+	and  $f0
+	or   d
+	ld   [hl], a
+	ret
+
+
+; Nibble C (0-3, leftmost first) of the seed, returned in A.
+GymReadSeedNibble::
+	ld   a, c
+	cp   2
+	jr   c, .fromHigh
+	ld   a, [wGymSeedLo]
+	jr   .haveByte
+
+.fromHigh:
+	ld   a, [wGymSeedHi]
+
+.haveByte:
+	bit  0, c
+	jr   nz, .lower
+	swap a
+
+.lower:
+	and  $0f
+	ret
+
+
+; Paint the level field, the SEED label and the four seed digits, blanking
+; whichever field has focus while the blink phase is off. Ten tilemap writes at
+; most, so it simply waits for VBlank - the original does the same in
+; HandleLockdownTransferToTilemap.
+GymPaintFields::
 .waitVBlank:
 	ldh  a, [rLY]
 	cp   SCRN_Y
 	jr   c, .waitVBlank
 
-	ld   a, [wGymPickerDrawn]
+; level field
+	ld   a, [wGymPickerLevel]
+	ld   b, FOCUS_LEVEL
+	call GymBlankIfFocused
 	ld   [PICKER_CELL], a
+
+; label - explicit tile indices, because no charmap is active in this file and
+; a string literal would assemble as ASCII
+	ld   hl, SEED_LABEL
+	ld   a, TILE_S
+	ld   [hl+], a
+	ld   a, TILE_E
+	ld   [hl+], a
+	ld   [hl+], a
+	ld   a, TILE_D
+	ld   [hl], a
+
+; four digits - the font puts 0-9 at $00-$09 and A-F at $0A-$0F, so the tile is
+; the nibble
+	ld   hl, SEED_CELL
+	ld   c, 0
+
+.digitLoop:
+	push hl
+	call GymReadSeedNibble
+	ld   b, a
+	ld   a, c
+	add  FOCUS_SEED
+	ld   d, a                       ; d = the focus value for this digit
+	ld   a, b
+	ld   b, d
+	call GymBlankIfFocused
+	pop  hl
+	ld   [hl+], a
+	inc  c
+	ld   a, c
+	cp   4
+	jr   c, .digitLoop
+	ret
+
+
+; A = TILE_BLANK when field B has focus and the blink is off, else A unchanged.
+GymBlankIfFocused::
+	push af
+	ld   a, [wGymBlinkPhase]
+	and  a
+	jr   nz, .keep                  ; blink on: draw normally
+	ld   a, [wGymFocus]
+	cp   b
+	jr   nz, .keep
+	pop  af
+	ld   a, TILE_BLANK
+	ret
+
+.keep:
+	pop  af
 	ret
 
 
@@ -433,23 +607,6 @@ GymDrawHearts::
 	ld   [HEART_CELL], a
 	ret
 
-
-; ---------------------------------------------------------------------------
-; Instant restart
-;
-; The original treats A+B+Select+Start during play as a reboot: back through
-; the Nintendo logo, two copyright screens, the title, the game type menu and
-; the level select. Fifteen-odd seconds to get back to the drill you were on.
-;
-; Restart the game instead, at the same level and hearts, by dropping the state
-; machine into GS_IN_GAME_INIT - exactly what the level select does when you
-; press Start.
-;
-; Note there are *two* soft-reset checks in the ROM: this one inside
-; InGameCheckResetAndPause, which fires while playing, and another in MainLoop
-; that runs immediately afterwards. Hooking only one is not enough - the other
-; reboots a moment later - so the buttons are consumed here.
-; ---------------------------------------------------------------------------
 
 ; Z is set when the soft-reset combination is held.
 GymResetComboHeld::
@@ -519,29 +676,18 @@ GymInGameReset::
 ; SPS seed
 ; ---------------------------------------------------------------------------
 
-; Arm SPS with the seed in DE. $0000 is a degenerate LFSR state - period 1,
-; every draw returns zero - so it is nudged to $0001. The community's seeded ROM
-; offers $0000 as its default and does not guard it, which may be part of why it
-; is described as "not perfect SPS". See docs/existing-hacks.md 4.2.
-GymSetSeed::
-	ld   a, d
-	or   e
-	jr   nz, .store
-	ld   d, 0
-	ld   e, 1
-
-.store:
-	ld   a, e
+; Copy the configured seed into the LFSR and arm SPS, or disarm it.
+;
+; A seed of $0000 means "off": pieces come from rDIV, exactly as the original
+; does, which is genuinely random. That also means the degenerate all-zero LFSR
+; state can never be reached - it is spent as the "no seed" value instead of
+; being a trap the way it is in the community's ROM (docs/existing-hacks.md 4.2).
+GymArmSeed::
+	ld   a, [wGymSeedLo]
 	ld   [wGymRngLo], a
-	ld   a, d
+	ld   b, a
+	ld   a, [wGymSeedHi]
 	ld   [wGymRngHi], a
-	ld   a, 1
-	ldh  [hGymSpsEnabled], a
-	ret
-
-
-; Turn SPS off: pieces come from rDIV again, exactly as the original does.
-GymClearSeed::
-	xor  a
-	ldh  [hGymSpsEnabled], a
+	or   b                          ; seed zero?
+	ldh  [hGymSpsEnabled], a        ; non-zero arms it, zero disarms it
 	ret

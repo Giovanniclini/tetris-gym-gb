@@ -11,8 +11,20 @@ grid of custom digit tiles (`$90-$99`) with a sprite cursor positioned from
 ## Decision
 
 **Leave the original grid completely alone** - same tiles, same cursor, same
-movement - and add **one picker cell to its right**, changed with Left and
-Right, showing `0-9` then `A-M`.
+movement - and add fields in the blank strip to its right. Columns 15-18, rows
+4-11 are uniform background inside the border, and four columns is exactly a
+16-bit seed in hex.
+
+```
+        cols 15-18
+   row  6      .  L  .  .      level, 0-9 then A-M
+   row  9      S  E  E  D
+   row 10      A  C  E  1      seed, four hex digits
+```
+
+Focus moves in a chain: **grid -> level -> the four seed digits**. Right on grid
+cell 9 enters the level field (a press the original ignores); Down from the
+level field drops into the seed; Left walks back the same way.
 
 * **Right on cell 9** gives the picker focus. The original ignores that press
   (`cp $09 / jr z`), so nothing has to be suppressed to reach it.
@@ -64,6 +76,16 @@ picker needs none of them.
   cursor code works untouched.
 * **Repaint one frame late.** The original's init copies the whole layout over
   the screen *after* our init runs, so a pending flag defers the paint.
+* **Up/Down mean different things per field**, deliberately: they navigate on
+  the level field and change the value on a seed digit. Making Left/Right always
+  navigate would be more consistent but would change the level field's behaviour,
+  which works. Each field behaves the way its own type suggests.
+* **A seed of `$0000` means "no seed"** - SPS off, pieces from `rDIV`, which is
+  genuinely random. That spends the degenerate all-zero LFSR state as the "off"
+  value rather than leaving it as a trap, and means there is nothing to
+  randomise: clearing the seed *is* randomising.
+* **No charmap is active in `src/gym/`**, so string literals assemble as ASCII.
+  Letters written to the tilemap must be explicit tile indices.
 * **Hearts are cleared above level 20.** Hard mode is `min(level + 10, 20)`, a
   ceiling written when 20 was the highest level; above it the clamp works
   *downward* and makes the game slower. Changing the formula would alter normal

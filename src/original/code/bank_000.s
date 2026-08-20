@@ -634,7 +634,16 @@ ENDC
 	dw GameState07_TitleScreenMain
 	dw GameState08_GameMusicTypeInit
 	dw Stub_148c
+; --- tetris-gym-gb deviation #12 (see src/original/UPSTREAM.md) ---
+; Routed through the Gym so the configured seed is loaded into the LFSR every
+; time a game begins. Without it a restart would continue the sequence rather
+; than repeat it, which defeats the point.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState0a_InGameInit
+ENDC
+; --- end deviation #12 ---
 	dw GameState0b_ScoreUpdateAfterBTypeLevelDone
 	dw GameState0c_UnusedPreShuttleLiftOff
 	dw GameState0d_GameOverScreenClearing
