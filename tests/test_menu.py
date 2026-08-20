@@ -36,18 +36,60 @@ GRAVITY_TABLE = [53, 49, 45, 41, 37, 33, 28, 22, 17, 11,
 
 
 def to_bank_from_here(t, bank):
-    """Cycle to a bank from an already-open level select screen."""
-    t.press("down")                       # onto the bottom row
-    while t[wGymLevelBank] != bank:
+    """Cycle to a bank from an open level select screen.
+
+    Navigation model: Down on the bottom row moves to the *top* row of the next
+    bank; Up on the top row moves to the bottom row of the previous one. So
+    each bank change costs two Downs from a top-row start.
+    """
+    for _ in range(24):
+        if t[wGymLevelBank] == bank:
+            return t
         t.press("down")
-    return t
+    raise AssertionError(f"could not reach bank {bank}")
 
 
 def to_bank(t, bank):
-    """Cycle to a bank. Down on the bottom row advances; the first Down from
-    level 0 just moves the cursor there."""
     t.to_level_select()
     return to_bank_from_here(t, bank)
+
+
+def goto(t, bank, cursor):
+    """Put the cursor on a specific cell of a specific bank, using only button
+    presses - no memory pokes."""
+    to_bank(t, bank)
+    if cursor >= 5:
+        if t[hATypeLevel] < 5:
+            t.press("down")             # top row -> bottom row, same bank
+    else:
+        if t[hATypeLevel] >= 5:
+            t.press("up")               # bottom row -> top row, same bank
+    while t[hATypeLevel] > cursor:
+        t.press("left")
+    while t[hATypeLevel] < cursor:
+        t.press("right")
+    assert t[hATypeLevel] == cursor, f"could not reach cell {cursor}"
+    assert t[wGymLevelBank] == bank, "navigation changed bank"
+    return t
+
+
+def settled_cells(t):
+    """Read the ten cells with the blink resolved.
+
+    On letter banks the selected cell blinks between its letter and blank, so a
+    single sample can catch either. Take the non-blank value seen over a full
+    blink period.
+    """
+    seen = [set() for _ in range(10)]
+    for _ in range(40):
+        t.tick(1)
+        for i, addr in enumerate(CELLS):
+            seen[i].add(t[addr])
+    out = []
+    for s in seen:
+        non_blank = [v for v in s if v != TILE_BLANK]
+        out.append(non_blank[0] if non_blank else TILE_BLANK)
+    return out
 
 
 def test_each_bank_draws_the_right_tiles():
@@ -55,7 +97,7 @@ def test_each_bank_draws_the_right_tiles():
     for bank in range(3):
         with Tetris(ROM) as t:
             to_bank(t, bank)
-            got = [t[a] for a in CELLS]
+            got = settled_cells(t)
             assert got == BANK_TILES[bank], (
                 f"bank {bank}: expected {[hex(x) for x in BANK_TILES[bank]]}, "
                 f"got {[hex(x) for x in got]}"
@@ -81,11 +123,9 @@ def test_cursor_cannot_leave_the_k_to_m_cells():
 
 def test_cursor_is_pulled_back_when_entering_the_k_to_m_bank():
     with Tetris(ROM) as t:
-        to_bank(t, 1)
-        for _ in range(4):
-            t.press("right")              # park the cursor beyond M's column
+        goto(t, 1, 9)                     # bottom row, beyond M's column
         assert t[hATypeLevel] > 2
-        t.press("down")                   # into bank 2
+        t.press("down")                   # falls into bank 2
         assert t[wGymLevelBank] == 2
         assert t[hATypeLevel] <= 2, f"cursor not clamped, got {t[hATypeLevel]}"
 
@@ -108,16 +148,9 @@ def test_select_toggles_hearts_and_shows_an_indicator():
 def test_starting_from_each_bank_gives_the_right_level():
     """The cursor holds 0-9 on this screen; the bank is folded back in only
     when the game starts."""
-    for bank, cursor, expected in ((0, 3, 3), (1, 3, 13), (2, 1, 21), (2, 2, 22)):
+    for bank, cursor, expected in ((0, 3, 3), (0, 7, 7), (1, 3, 13), (2, 1, 21), (2, 2, 22)):
         with Tetris(ROM) as t:
-            to_bank(t, bank)
-            # walk the cursor to the wanted column on the top row
-            while t[hATypeLevel] >= 5:
-                t.press("up")
-            while t[hATypeLevel] > cursor:
-                t.press("left")
-            while t[hATypeLevel] < cursor:
-                t.press("right")
+            goto(t, bank, cursor)
             t.press("start")
             t.run_until_state(GS_IN_GAME_MAIN)
             assert t[hATypeLevel] == expected, (
@@ -130,11 +163,7 @@ def test_l_and_m_are_reachable_through_the_menu_alone():
     """The whole point: no poking memory, just button presses."""
     for cursor, level, gravity in ((1, 21, GRAVITY_L), (2, 22, GRAVITY_M)):
         with Tetris(ROM) as t:
-            to_bank(t, 2)
-            while t[hATypeLevel] > cursor:
-                t.press("left")
-            while t[hATypeLevel] < cursor:
-                t.press("right")
+            goto(t, 2, cursor)
             t.press("start")
             t.run_until_state(GS_IN_GAME_MAIN)
             assert t[hATypeLevel] == level
@@ -178,6 +207,47 @@ def test_hearts_indicator_shows_when_armed_at_the_title_screen():
     with Tetris(ROM) as t:
         t.to_level_select(hearts=True)
         assert t[HEART_CELL] == TILE_HEART, "indicator missing for title-armed hearts"
+
+
+def test_selected_letter_blinks_at_the_original_cadence():
+    """The cursor sprite draws the character for the level, and the ROM only has
+    those sprite specs for digits 0-9 - on a letter bank it drew a digit over a
+    letter. The sprite is hidden and the letter blinks instead, at the
+    original's own 16-frame cadence. See docs/decisions/0003.
+    """
+    with Tetris(ROM) as t:
+        goto(t, 1, 0)
+        assert t[0xC200] == 0x80, "cursor sprite should be hidden on a letter bank"
+
+        seen = []
+        for _ in range(70):
+            t.tick(1)
+            seen.append(t[CELLS[0]])
+        assert 0x0A in seen, "letter never drawn"
+        assert TILE_BLANK in seen, "letter never blanked - no blink"
+
+        runs = []
+        for v in seen:
+            if not runs or runs[-1][0] != v:
+                runs.append([v, 1])
+            else:
+                runs[-1][1] += 1
+        full = [n for _, n in runs[1:-1]]        # ignore partial runs at the ends
+        assert full and all(n == 16 for n in full), (
+            f"expected 16-frame phases, got {full}"
+        )
+
+
+def test_bank_change_lands_on_the_top_row():
+    """Falling off the bottom of a bank should land on the top row of the next,
+    not on the bottom row you just left."""
+    with Tetris(ROM) as t:
+        goto(t, 0, 7)
+        t.press("down")
+        assert t[wGymLevelBank] == 1
+        assert t[hATypeLevel] < 5, (
+            f"expected the top row after a bank change, got cell {t[hATypeLevel]}"
+        )
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

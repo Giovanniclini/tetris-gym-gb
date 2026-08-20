@@ -5,10 +5,12 @@
 
 INCLUDE "include/hardware.inc"
 INCLUDE "include/constants.s"   ; pure EQUs, safe in multiple translation units
+INCLUDE "include/structs.s"     ; rb offsets, likewise
 
 INCLUDE "gym/levels.inc"
 
 DEF TILE_HEART          EQU $27
+DEF TILE_BLANK_CELL     EQU $2f
 DEF TILE_LEVEL_ROW_BLANK EQU $2c ; what the original draws there
 
 ; hram.s declares a real SECTION, so it cannot be included twice. Its labels
@@ -51,7 +53,12 @@ wGymLevelBank:: db
 ; indicator have to be painted on the frame after, not during init.
 wGymRedrawPending:: db
 
-	ds 1022
+; Blink state for the selected cell on letter banks.
+wGymBlinkTimer:: db
+wGymBlinkPhase:: db
+wGymBlinkCell::  db          ; $ff = no cell currently blanked
+
+	ds 1019
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -89,8 +96,13 @@ GymDispatch::
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
 
+; The original main handler only calls bank-0 routines, so we can run it
+; ourselves and then correct what it did. Fixing up afterwards is the only way
+; to move the cursor sprite, which the original repositions on its own terms.
 	call GymLevelSelectMain
-	ld   hl, GameState11_ATypeSelectionMain
+	call GameState11_ATypeSelectionMain
+	call GymLevelSelectPost
+	ld   hl, Stub_148c              ; the stub's `jp hl` must land somewhere
 	ret
 
 .init:
@@ -122,6 +134,14 @@ GymLevelSelectInit::
 
 	ld   a, 1
 	ld   [wGymRedrawPending], a
+	; fall through
+
+; Clear the blink so a stale blanked cell cannot survive into a repaint.
+GymResetBlink::
+	ld   a, $10                     ; phase on
+	ld   [wGymBlinkPhase], a
+	ld   a, $ff                     ; no cell blanked
+	ld   [wGymBlinkCell], a
 	ret
 
 
@@ -143,14 +163,6 @@ GymLevelSelectMain::
 .readInput:
 	ldh  a, [hButtonsPressed]
 	ld   c, a
-
-; Start or A begins the game. hATypeLevel has been holding the cursor index so
-; that the original cursor code keeps working unchanged, so fold the bank back
-; in before the original handler hands over to the game.
-	bit  PADB_START, c
-	jr   nz, .combineLevel
-	bit  PADB_A, c
-	jr   nz, .combineLevel
 
 ; Select toggles hard mode ("hearts"). The original arms it with an
 ; undocumented Down+Start on the title screen, two screens earlier, with no
@@ -185,6 +197,12 @@ GymLevelSelectMain::
 	ld   a, e
 	cp   5
 	ret  c                          ; not on the bottom row
+
+; Falling off the bottom of one bank lands on the *top* row of the next, so
+; Down keeps reading as "keep going down" rather than dumping you back on the
+; bottom row you just left.
+	sub  5
+	ldh  [hATypeLevel], a
 	jr   .bankNext
 
 .checkUp:
@@ -193,6 +211,9 @@ GymLevelSelectMain::
 	ld   a, e
 	cp   5
 	ret  nc                         ; not on the top row
+
+	add  5                          ; and Up lands on the bottom row above
+	ldh  [hATypeLevel], a
 	jr   .bankPrev
 
 ; The K-M bank has only three cells, all on the top row, so vertical movement
@@ -204,33 +225,7 @@ GymLevelSelectMain::
 	bit  PADB_UP, c
 	jr   nz, .bankPrev
 
-	bit  PADB_RIGHT, c
-	ret  z
-	ldh  a, [hATypeLevel]
-	cp   GYM_TOP_BANK_COUNT - 1
-	ret  c                          ; room left, let the original move
-	jr   .consumeMovement           ; at M already
-
-.combineLevel:
-	ld   a, [wGymLevelBank]
-	and  a
-	ret  z                          ; bank 0: the cursor already is the level
-
-	ld   b, a
-	ldh  a, [hATypeLevel]
-
-.addTens:
-	add  10
-	dec  b
-	jr   nz, .addTens
-
-	cp   MAX_LEVEL + 1              ; belt and braces; the cursor clamp should
-	jr   c, .storeLevel             ; already make this unreachable
-	ld   a, MAX_LEVEL
-
-.storeLevel:
-	ldh  [hATypeLevel], a
-	ret
+	ret                             ; Left/Right are clamped by the post-pass
 
 .toggleHearts:
 	ldh  a, [hIsHardMode]
@@ -263,19 +258,24 @@ GymLevelSelectMain::
 .setBank:
 	ld   [wGymLevelBank], a
 
-; Pull the cursor back if it is parked beyond M in the top bank.
 	cp   GYM_LEVEL_BANKS - 1
 	jr   nz, .afterClamp
+
+; Hearts cannot help at K-M, so clear them on arrival - unconditionally, not
+; only when the cursor also needs clamping. Landing on cell 0 needs no clamp,
+; which is how hearts survived into K-M before.
+	xor  a
+	ldh  [hIsHardMode], a
+
+; Pull the cursor back if it is parked beyond M.
 	ldh  a, [hATypeLevel]
 	cp   GYM_TOP_BANK_COUNT
 	jr   c, .afterClamp
 	ld   a, GYM_TOP_BANK_COUNT - 1
 	ldh  [hATypeLevel], a
 
-	xor  a                          ; hearts cannot help at K-M; see above
-	ldh  [hIsHardMode], a
-
 .afterClamp:
+	call GymResetBlink
 	call .consumeMovement
 	ld   a, SND_MOVING_SELECTION
 	ld   [wSquareSoundToPlay], a
@@ -288,9 +288,109 @@ GymLevelSelectMain::
 	ldh  a, [hButtonsPressed]
 	res  PADB_UP, a
 	res  PADB_DOWN, a
-	res  PADB_RIGHT, a
 	ldh  [hButtonsPressed], a
 	ret
+
+
+; Runs after the original handler, which is the only point at which the cursor
+; sprite can be corrected - the original positions it on its own terms.
+;
+; Two jobs:
+;   1. Keep the cursor inside K, L and M, and move the sprite to match.
+;   2. On letter banks, hide the sprite and blink the letter instead. The
+;      cursor sprite draws the *character* for the level ($20 + level selects a
+;      one-tile sprite spec), and the ROM only has those specs for digits 0-9 -
+;      so on a letter bank it draws a digit over the letter. Adding letter
+;      sprites would mean extending SpriteData, which shifts bank 0, so we
+;      blink the background cell instead.
+GymLevelSelectPost::
+	ldh  a, [hGameState]
+	cp   GS_A_TYPE_SELECTION_MAIN
+	jr   nz, .leavingScreen
+
+	ld   a, [wGymLevelBank]
+	and  a
+	jr   nz, .letterBank
+
+; digit bank: the original behaviour is already right, just undo any blink
+	ld   a, [wGymBlinkCell]
+	inc  a
+	ret  z                          ; $ff = nothing blanked
+	xor  a
+	dec  a
+	ld   [wGymBlinkCell], a
+	ret
+
+; The original has handed over - to the game, or back a screen. hATypeLevel has
+; been holding a cursor index so the original cursor code kept working; now
+; that nothing else will read it as an index, fold the bank in.
+;
+; This has to happen *after* the original handler, not before it. Doing it
+; first meant the clamp below saw a real level rather than a cursor index and
+; pulled level 21 back to 2.
+.leavingScreen:
+	ld   a, [wGymLevelBank]
+	and  a
+	ret  z                          ; bank 0: the cursor already is the level
+
+	ld   b, a
+	ldh  a, [hATypeLevel]
+
+.addTens:
+	add  10
+	dec  b
+	jr   nz, .addTens
+
+	cp   MAX_LEVEL + 1              ; belt and braces
+	jr   c, .storeLevel
+	ld   a, MAX_LEVEL
+
+.storeLevel:
+	ldh  [hATypeLevel], a
+	ret
+
+.letterBank:
+	cp   GYM_LEVEL_BANKS - 1
+	jr   nz, .afterClampCursor
+
+	ldh  a, [hATypeLevel]
+	cp   GYM_TOP_BANK_COUNT
+	jr   c, .afterClampCursor
+
+	ld   a, GYM_TOP_BANK_COUNT - 1  ; walked past M: pull back and move the
+	ldh  [hATypeLevel], a           ; sprite, which the original will not do
+	ld   de, wSpriteSpecs + SPR_SPEC_BaseYOffset
+	ld   hl, ATypeLevelsCoords
+	call SetNumberSpecStructsCoordsAndSpecIdxFromHLtable
+	call Copy2SpriteSpecsToShadowOam
+
+.afterClampCursor:
+; the digit sprite would sit on top of a letter, so keep it hidden
+	ld   a, SPRITE_SPEC_HIDDEN
+	ld   [wSpriteSpecs + SPR_SPEC_Hidden], a
+
+; blink the selected letter at the original cadence: 16 frames on, 16 off
+	ld   hl, wGymBlinkTimer
+	inc  [hl]
+	ld   a, [hl]
+	and  $10
+	ld   b, a                       ; b = phase
+
+	ldh  a, [hATypeLevel]
+	ld   c, a                       ; c = selected cell
+	ld   a, [wGymBlinkCell]
+	cp   c
+	jr   nz, .repaint               ; cursor moved: repaint both cells
+	ld   a, [wGymBlinkPhase]
+	cp   b
+	ret  z                          ; nothing changed
+
+.repaint:
+	ld   a, b
+	ld   [wGymBlinkPhase], a
+	ld   a, c
+	ld   [wGymBlinkCell], a
+	jp   GymRedrawLevelScreen
 
 
 ; Repaint the ten level cells, and the hearts indicator, to match the current
@@ -316,8 +416,10 @@ GymRedrawLevelScreen::
 
 .haveTiles:
 	ld   de, _SCRN0 + 6 * 32 + 5    ; top row of level cells
+	ld   b, 0
 	call .writeRow
 	ld   de, _SCRN0 + 8 * 32 + 5    ; bottom row
+	ld   b, 5
 	call .writeRow
 
 ; hearts indicator, in the blank strip to the right of "LEVEL"
@@ -331,14 +433,34 @@ GymRedrawLevelScreen::
 	ld   [_SCRN0 + 4 * 32 + 14], a
 	ret
 
+; Blank the selected cell while the blink phase is off, so the letter flashes
+; in place of the digit sprite we had to hide.
+.maybeBlank:
+	push af
+	ld   a, [wGymBlinkPhase]
+	and  a
+	jr   nz, .keepTile              ; phase on: draw normally
+	ld   a, [wGymBlinkCell]
+	cp   b
+	jr   nz, .keepTile
+	pop  af
+	ld   a, TILE_BLANK_CELL
+	ret
+
+.keepTile:
+	pop  af
+	ret
+
 .writeRow:
 	ld   c, 5
 
 .cellLoop:
 	ld   a, [hl+]
+	call .maybeBlank
 	ld   [de], a
 	inc  de
 	inc  de                         ; cells are two tiles apart
+	inc  b                          ; b tracks which cell we are on
 	dec  c
 	jr   nz, .cellLoop
 	ret

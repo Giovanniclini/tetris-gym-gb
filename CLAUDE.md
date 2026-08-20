@@ -26,7 +26,7 @@ It is **not** a new Tetris implementation, and **not** a modernisation.
 | `docs/architecture.md` | Current architecture decisions (D1–D8), repository layout, the original/Gym code boundary, memory plan, build system, testing strategy |
 | `docs/roadmap.md` | Current milestones and acceptance criteria |
 | `docs/existing-hacks.md` | Reverse engineering of the community's ROM hacks — KLM's extended gravity table, the SPS LFSR, what we must match |
-| `docs/decisions/` | Architecture Decision Records for anything significant decided later |
+| `docs/decisions/` | Architecture Decision Records — **read these before touching Gym code**; they record constraints found the hard way (bank switching, hook style, level-select gotchas) |
 
 **If a task touches architecture, memory layout, the build, the ROM version, or the
 original/Gym boundary, read the relevant document first.** These documents contain measured facts
