@@ -128,8 +128,12 @@ is the difference between one attempt and twenty.
 
 **Work**
 1. Gym menu on an unused `hGameState` jump-table slot, reachable from the title screen.
-2. **Start on any level 0–20 with a heart-level toggle** — write `hATypeLevel` and the gravity
+2. **Start on any level 0–20 (A–K) with a heart-level toggle** — write `hATypeLevel` and the gravity
    reload value from the table at `$1B06`.
+   **Scope note:** deliberately stops at K (level 20). Every value up to K comes from the game's own
+   table and needs no guessing. KLM's L (21) and M (22) are *not* publicly available
+   (`docs/community-research.md` §3.5.1a) — we have one chat message for L's speed and nothing for
+   M. Extend to L–M in a follow-up once KLM can be matched directly.
 3. **Instant restart**: retarget the existing `A+B+Select+Start` soft reset to restart the current
    trainer with identical settings instead of rebooting.
 4. Gym config persisted to SRAM; restored on boot.

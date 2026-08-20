@@ -253,6 +253,32 @@ Inventory assembled by *Tolstoj* (2022) and updated through 2026:
 | Transition trainer patch | mathmaster13 | In progress as of 2026-05 | **Someone is already on this — coordinate, do not duplicate** |
 | Hz counter | — | **Does not exist.** *"I don't know of a Hz counter romhack for GB"* (Hepta) | Wanted |
 
+### 3.5.1a Availability: the competition ROMs are not public
+
+**[VERIFIED 2026-08-20 — searched, not found]**
+
+| Searched | Result |
+| --- | --- |
+| GitHub repos and code search | **0 results** for KLM / Game Boy Tetris trainer ROMs |
+| [romhacking.net GB Tetris hacks](https://www.romhacking.net/games/2622/) | Rosy Retrospection (+DX), Max Speed, highscore save, [Colorization](https://www.romhacking.net/hacks/8240/), [Cross](https://www.romhacking.net/hacks/7471/), 1984, Ospin's "Classic Harddrop". **No KLM, no sprint ROM.** |
+| Internet Archive | Only Rosy Retrospection DX |
+| `gameboytetr.is` | Tournament brackets only; `/roms`, `/patches`, `/downloads` all 404 |
+
+**KLM and the 40-line sprint ROM are distributed solely as pinned attachments in the GBTetris
+Discord's `#romhacks-modify` channel** — consistent with §3.5.8, where Tolstoj says he still *plans*
+a public KLM repo.
+
+**This sharpens the project's value proposition.** The community's two most-used ROMs have no public
+source, no version control, and no distribution outside one Discord channel. That is the gap, and it
+is a stronger pitch to Tolstoj than "I would like to build a gym".
+
+**Consequence for Milestone 1.** Levels 10–20 (A–K) are fully derivable from the 21-entry gravity
+table at `$1B06` in the ROM we already build byte-exactly. **L (21) and M (22) are not** — the only
+figure we have for L is a chat message (*"2 frames/row vs level 20's 3"*), and for M we have
+nothing. Ship A–K from the ROM's own table, and extend to L–M only once KLM can be matched directly.
+Inventing timings that silently differ from what people compete on would be worse than shipping
+less. See §7 A7.
+
 ### 3.5.2 "L start" — decoded
 
 **KLM = levels K, L, M = 20, 21, 22.** Level is a single tile with a sequential charmap, so 10–20
