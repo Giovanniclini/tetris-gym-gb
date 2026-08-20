@@ -16,6 +16,11 @@
 ;                                            follows the RST $08 vector.
 ;   HOOK_GRAVITY_PTR  $1AFB-$1AFC         2  Operand of `ld hl, .framesData`,
 ;                                            redirected to GymFramesData.
+;   HOOK_STATE_TABLE  $031B-$031E         4  Two entries of ProcessGameState's
+;                                            jump table ($10 A-type select
+;                                            init, $11 main), routed through
+;                                            GymStateHook. The handlers
+;                                            themselves are untouched.
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.

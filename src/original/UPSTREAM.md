@@ -19,7 +19,7 @@ which remains copyrighted. See `docs/research.md` §7.
 
 ## Local deviations from upstream
 
-Four, all minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
+Five, all minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
 
 Only three categories of deviation are ever permitted, and every one must be
 listed in the table below with a justification (see `docs/architecture.md` §3.1):
@@ -38,6 +38,7 @@ listed in the table below with a justification (see `docs/architecture.md` §3.1
 | 2 | `include/wram.s` | Split the monolithic `$C000-$DFFC` section, starting a new `"WRAM Audio"` section at `$DF70` | 2 (section split) | Upstream declares all of WRAM as one section, so the linker cannot see the 2062-byte gap at `$D762-$DF6F` that the game never touches. No label moves. | **0** — WRAM is not in the ROM image |
 | 3 | `code/bank_000.s` | `IF GYM` include of `gym/gravity.inc` into the `ds $28-@, $ff` padding, and the `ld hl, .framesData` operand redirected to it | 3 (hook) | Levels L (21) and M (22) need a 23-entry gravity table. Placing it in reclaimed padding and redirecting the pointer avoids shifting bank 0. KLM achieves the same feature by relocating the table, which moves every byte after it — 20 870 bytes changed versus our 25. | 23 (table) + 2 (pointer operand). Zero when `GYM=0`. |
 | 4 | `code/inGameFlow.s` | `IF GYM` raises the level-up cap from `$14` to `MAX_LEVEL` (`$16`) | 3 (hook) | With L and M selectable, a level-up from an L start would otherwise run past the end of the gravity table and read code as gravity values. **KLM has this bug** — it adds L and M but leaves the cap at `$14`. Latent (an L start needs ~220 lines to level up) but wrong. | 1. Zero when `GYM=0`. |
+| 5 | `code/bank_000.s` | `IF GYM` swaps two entries of `ProcessGameState`'s jump table (`$10` A-type select init, `$11` main) for `GymStateHook` | 3 (hook) | Routes the level-select screen through Gym code, which runs its own logic and then chains to the original handler. The handlers themselves are unmodified. | 4 (two `dw` entries). Zero when `GYM=0`. |
 
 ## What was not vendored
 

@@ -616,8 +616,18 @@ ProcessGameState:
 	dw GameState0d_GameOverScreenClearing
 	dw GameState0e_GameTypeMain
 	dw GameState0f_MusicTypeMain
+; --- tetris-gym-gb deviation #5 (see src/original/UPSTREAM.md) ---
+; Both A-type selection states route through the Gym, which runs its own logic
+; and then chains to the original handler. Two two-byte table entries; the
+; handlers themselves are untouched.
+IF GYM
+	dw GymStateHook
+	dw GymStateHook
+ELSE
 	dw GameState10_ATypeSelectionInit
 	dw GameState11_ATypeSelectionMain
+ENDC
+; --- end deviation #5 ---
 	dw GameState12_BTypeSelectionInit
 	dw GameState13_BTypeSelectionMain
 	dw GameState14_BTypeHighMain

@@ -49,4 +49,6 @@ jobs:
       - name: Install the test-only emulator dependency
         run: python3 -m pip install pyboy
       - name: Behavioural tests
-        run: python3 tests/test_behaviour.py
+        run: |
+          python3 tests/test_behaviour.py
+          python3 tests/test_menu.py

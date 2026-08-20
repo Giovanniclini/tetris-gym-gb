@@ -29,3 +29,21 @@ FarCall::
 
 .jumpHL:
 	jp   hl
+
+
+; Gym state hook.
+;
+; The game-state jump table does `jp hl` to whichever handler it selects, so a
+; redirected entry lands here. We hand control to Gym code in bank 2, which
+; does its own work and returns - in HL - the address of the original handler
+; to run. That keeps this stub at 9 bytes and lets Gym own the decision.
+;
+; Bank 2 code must never switch banks itself: it executes from $4000-$7FFF, so
+; the instruction after the switch would be fetched from the new bank. All
+; switching happens here in bank 0, which is always mapped.
+
+GymStateHook::
+	ld   b, BANK(GymDispatch)
+	ld   hl, GymDispatch
+	call FarCall
+	jp   hl

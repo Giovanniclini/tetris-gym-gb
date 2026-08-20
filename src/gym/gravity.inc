@@ -11,7 +11,7 @@
 ; Lives in the 29 bytes of $ff padding at $000B-$0027 so bank 0 keeps its
 ; original layout. 23 bytes used, 6 spare.
 
-DEF MAX_LEVEL EQU 22
+INCLUDE "gym/levels.inc"
 
 GymFramesData::
 	;   0    1    2    3    4    5    6    7    8    9

@@ -101,7 +101,7 @@ def main() -> int:
     units = UNITS + (GYM_UNITS if gym else [])
     for unit, path in units:
         obj = OBJ / f"{unit}.o"
-        run([tc / "rgbasm", "-h", "-L",
+        run([tc / "rgbasm", "-h", "-L", "-E",
              "-D", f"GYM={gym}",
              "-I", str(SRC) + "/", "-I", str(OBJ) + "/",
              "-I", str(ROOT / "src") + "/",

@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ALLOWED_RANGES = [
     (0x000B, 0x0027, "GYM_GRAVITY_TABLE - 23-entry gravity table in RST $08 padding"),
     (0x00DA, 0x00FF, "HOOK_TRAMPOLINE - Gym far-call trampoline in entry-point padding"),
+    (0x031B, 0x031E, "HOOK_STATE_TABLE - A-type selection states routed via the Gym"),
     (0x1AFB, 0x1AFC, "HOOK_GRAVITY_PTR - table pointer redirected to GymFramesData"),
     (0x2459, 0x2459, "HOOK_LEVEL_CAP - level-up cap raised from $14 to $16"),
     (0x0147, 0x0147, "cartridge type -> MBC1+RAM+BATTERY"),
