@@ -14,11 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.emu import Tetris, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
+from tools.emu import Tetris, sym, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
 
 ROM = "build/tetrisgym.gb"
-wGymRngLo, wGymRngHi = 0xD806, 0xD807
-wGymSeedLo, wGymSeedHi = 0xD808, 0xD809
+wGymRngLo, wGymRngHi = sym("wGymRngLo"), sym("wGymRngHi")
+wGymSeedLo, wGymSeedHi = sym("wGymSeedLo"), sym("wGymSeedHi")
 GS_IN_GAME_INIT = 0x0A
 hGymSpsEnabled = 0xFFFE
 hHiddenLoadedPiece = 0xFFAE
@@ -203,7 +203,7 @@ def test_the_seed_is_reloaded_at_the_start_of_every_game():
 
 
 def test_seed_can_be_entered_from_the_menu():
-    """Grid -> Right on 9 -> level field -> Down -> four hex digits, each
+    """Grid -> Right on 9 -> level field -> Right -> four hex digits, each
     changed with Up and Down."""
     with Tetris(ROM) as t:
         t.to_level_select()
@@ -211,7 +211,7 @@ def test_seed_can_be_entered_from_the_menu():
         while t[hATypeLevel] < 9:
             t.press("right")
         t.press("right")                       # level field
-        t.press("down")                        # first seed digit
+        t.press("right")                       # first seed digit
         for nibble in (0xA, 0xC, 0xE, 0x1):
             for _ in range(nibble):
                 t.press("up")

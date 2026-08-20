@@ -185,6 +185,9 @@ verified against their ROM (`docs/existing-hacks.md` §4), with seed entry besid
 the level picker. A seed of `$0000` means "no seed", so SPS is off and pieces
 come from `rDIV` as they always did.
 
+**Status 2026-08-21:** levels A–M have their own high-score slots, so a score is
+filed and shown under the level it was played at (`docs/decisions/0006`).
+
 Work follows the revised list in `docs/community-research.md` §6.2:
 
 1. **SPS — standardised same piece sequence** (§6.2 #1). *The headline feature.* Design is now

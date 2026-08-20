@@ -54,6 +54,20 @@ hIsHardMode = 0xFFF4
 BOOT_TIMEOUT = 2000     # frames; the copyright screens alone are ~500
 
 
+def sym(name, rom="build/tetrisgym.sym"):
+    """Address of a label, read from the linker's symbol file.
+
+    Gym RAM moves as the layout changes; a test that hardcodes an address
+    silently asserts on the wrong byte when it does.
+    """
+    path = ROOT / rom
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1] == name:
+            return int(parts[0].split(":")[1], 16)
+    raise KeyError(f"{name} not in {path}")
+
+
 class Tetris:
     """A running Game Boy Tetris, driven a frame at a time."""
 

@@ -53,10 +53,11 @@ does not need competition.
 
 | | |
 | --- | --- |
-| **Level select to M** | Levels `0-9` and `A-M` from a picker beside the original grid — `M` is one row per frame, the engine's ceiling |
+| **Level select to M** | Levels `0-9` and `A-M` from a picker beside the original grid — `Right` off cell 9 to reach it, `Up`/`Down` to choose. `M` is one row per frame, the engine's ceiling |
 | **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
 | **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
-| **SPS** | A seed beside the level picker. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
+| **SPS** | Four hex digits, one `Right` on from the level picker. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
+| **High scores per level** | `A-M` get their own slots, so the `TOP SCORE` panel tracks the level you are about to play |
 
 **Next**
 
