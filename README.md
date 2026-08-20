@@ -167,22 +167,25 @@ In mGBA: *Settings → Game Boy → Game Boy model → **Game Boy Color***.
 
 ## Contributing
 
-Current status is in [`docs/roadmap.md`](docs/roadmap.md). The most valuable contributions
-right now are **not** code:
+Contributions are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the workflow, the local
+build and test commands, and the rules that matter. [`docs/roadmap.md`](docs/roadmap.md) has
+what is planned and what is done.
 
-* **Talk to the GBTetris Discord.** First contact already corrected two ranking errors and surfaced
-  the community's actual blocker (SPS). The open questions are listed in
-  [`docs/community-research.md`](docs/community-research.md) §7 — several are one-line answers from
-  anyone who plays.
-* **Catalogue the existing GB Tetris hacks**, especially the "more level starts + score digit +
-  rocket skip" ROM already in general use. This project should be a clean superset of what people
-  already have, not a competitor to it.
-* **Search r/Tetris and r/classictetris** for Game Boy practice discussion — a known blind spot in
-  the research.
-* **Confirm the canonical ROM version** used by CTWC-GB and speedrun.com rules.
+Especially useful right now:
 
-For code: read `CLAUDE.md`, then `docs/architecture.md` §8 (adding a trainer). The rule that matters
-most is that `python3 build.py --original` must keep reproducing the original ROM byte-exactly.
+* **Play it and report what feels wrong.** If a timing does not match what you are used to,
+  that is a bug — say which level, which mode, and what you expected.
+* **Test it on real hardware.** Nobody has. Whether it boots on a DMG or GBC from an EverDrive
+  GB or EZ-Flash Junior is an open question.
+* **Answer a question about how Game Boy Tetris is actually played.** Several are open in
+  [`docs/community-research.md`](docs/community-research.md) §7 — the online qualifier format,
+  which hardware people practise on, the exact start and stop frames of the community's sprint
+  timer. Most are one line from anyone who competes.
+* **Code.** Take something from the roadmap or bring your own. Open an issue first for anything
+  large, so we do not both build it.
+
+The rule that overrides everything: `python3 build.py --original` must keep reproducing the
+stock ROM byte-exactly. A change that cannot keep that green is the wrong change.
 
 ## Licence and legal
 

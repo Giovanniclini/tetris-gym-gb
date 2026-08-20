@@ -3,7 +3,8 @@
 ## Workflow
 
 `main` is protected. Work happens on a branch and lands through a pull request
-once CI is green.
+once CI is green. Without write access, fork first and open the PR from your
+fork — the flow is otherwise the same.
 
 ```
 git checkout -b short-description
@@ -22,34 +23,28 @@ CI must pass before merging. What it checks:
 | Behavioural tests | Drives the ROM in an emulator: level picker, instant restart, timings |
 | No ROM data tracked | We ship patches, never ROM data |
 
-macOS is checked weekly rather than per push - it costs 10x the CI minutes on a
-private repo and queues badly.
+macOS is checked weekly rather than per push: it queues badly and has never
+caught anything Linux did not.
 
 ## Branch protection (applied)
 
-`main` requires a green CI run before anything merges:
+Recorded here in case it ever needs re-applying. Under **Settings → Branches**,
+`main` has:
 
-- a pull request is required
-- **`build and test`** must pass
-- the branch must be up to date with `main` before merging
-- force pushes and deletions are blocked
-
-Admin enforcement is deliberately off and no approving review is required, so a
-solo maintainer can still merge their own PRs - but nothing lands red.
-
-Recorded here in case it ever needs re-applying. The settings are under
-**Settings → Branches**, or:
-
-**Settings → Branches → Add branch ruleset**, target `main`:
-
-- Require a pull request before merging
-- Require status checks to pass, and add **`build and test`** (the job name in
+- a pull request required before merging
+- **`build and test`** required to pass (the job name in
   `.github/workflows/ci.yml`; it only becomes selectable after the workflow has
   run once)
-- Require branches to be up to date before merging
+- the branch required to be up to date with `main` before merging
+- force pushes and deletions blocked
+- **admin enforcement on** — the maintainer is bound by all of the above
 
-Leave "required approving reviews" at 0 and admin enforcement off while the
-project is one person: you can still merge your own PRs, but nothing lands red.
+Required approving reviews are **0**, because GitHub never lets you approve your
+own pull request and the project is one person. That is what lets a solo
+maintainer merge; admin enforcement is what stops anything landing red.
+
+Nobody without write access can merge in any case: outside contributions arrive
+as pull requests from forks, which only a collaborator can merge.
 
 The same thing with the GitHub CLI, once `gh auth login` has been done:
 
@@ -57,7 +52,7 @@ The same thing with the GitHub CLI, once `gh auth login` has been done:
 gh api -X PUT repos/Giovanniclini/tetris-gym-gb/branches/main/protection \
   -f 'required_status_checks[strict]=true' \
   -f 'required_status_checks[contexts][]=build and test' \
-  -F 'enforce_admins=false' \
+  -F 'enforce_admins=true' \
   -F 'required_pull_request_reviews[required_approving_review_count]=0' \
   -F 'restrictions=null'
 ```
@@ -79,6 +74,7 @@ python3 -m venv .venv
 .venv/bin/python tests/test_behaviour.py
 .venv/bin/python tests/test_menu.py
 .venv/bin/python tests/test_restart.py
+.venv/bin/python tests/test_sps.py
 ```
 
 The whole suite takes about 15 seconds.
