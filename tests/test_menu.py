@@ -19,6 +19,7 @@ from tools.emu import Tetris, hATypeLevel, hIsHardMode, GS_IN_GAME_MAIN  # noqa:
 ROM = "build/tetrisgym.gb"
 
 wGymFocus = 0xD800
+wGymPickerLevel = 0xD801
 FOCUS_GRID, FOCUS_LEVEL, FOCUS_SEED = 0, 1, 2
 wGymPickerLevel = 0xD801
 
@@ -239,6 +240,55 @@ def test_heart_speeds_are_unchanged_for_the_original_levels():
         with Tetris(ROM) as t:
             t.start_game_at(level, hearts=True)
             assert t.gravity() == GRAVITY[effective]
+
+
+def test_high_scores_follow_the_picked_level():
+    """The TOP SCORE panel is driven by hATypeLevel, which the Gym keeps as the
+    grid index while the level field has focus - so it used to keep showing the
+    grid cursor's scores while you had M selected.
+
+    The table has ten slots, one per grid level; A-M have no storage, so those
+    show the dotted placeholder the original already uses for empty entries.
+    """
+    HISCORE_BASE, HISCORE_SIZEOF = 0xD654, 27
+    PANEL = [0x9800 + r * 32 + c for r in (13, 14, 15) for c in range(3, 17)]
+    TILE_DOT = 0x60
+
+    def dots(t):
+        t.tick(20)
+        return sum(1 for a in PANEL if t[a] == TILE_DOT)
+
+    with Tetris(ROM) as t:
+        t.to_level_select()
+        slot = HISCORE_BASE + 5 * HISCORE_SIZEOF
+        for i, v in enumerate((0x12, 0x34, 0x56)):        # a score for level 5
+            t.pb.memory[slot + i] = v
+        for i in range(6):
+            t.pb.memory[slot + 9 + i] = 0x0A + i
+
+        t.press("right")
+        t.press("left")                                    # force a refresh
+        empty = dots(t)                                    # level 0: nothing set
+
+        while t[hATypeLevel] < 5:
+            t.press("right")
+        with_score = dots(t)
+        assert with_score < empty, "planted score did not show; test proves nothing"
+
+        while t[hATypeLevel] < 9:
+            t.press("right")
+        t.press("right")                                   # level field, at 10
+        assert dots(t) == empty, "A has no high score slots; expected placeholders"
+
+        while t[wGymPickerLevel] > 5:
+            t.press("left")
+        assert dots(t) == with_score, (
+            "the panel should show level 5's scores when the level field is on 5"
+        )
+
+        while t[wGymPickerLevel] < 22:
+            t.press("right")
+        assert dots(t) == empty, "M has no high score slots; expected placeholders"
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

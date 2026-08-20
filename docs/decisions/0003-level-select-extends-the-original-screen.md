@@ -86,6 +86,15 @@ picker needs none of them.
   randomise: clearing the seed *is* randomising.
 * **No charmap is active in `src/gym/`**, so string literals assemble as ASCII.
   Letters written to the tilemap must be explicit tile indices.
+* **The TOP SCORE panel follows the picked level.** It is driven by
+  `hATypeLevel`, which the Gym keeps as the grid index, so it used to keep
+  showing the grid cursor's scores while you had M selected. The table has ten
+  slots, one per grid level; A-M have no storage, so those show the dotted
+  placeholder the original already uses for empty entries.
+* **Do not repaint the score panel on the deferred repaint.** The original's own
+  init already paints it, and doing it again there cost `hATypeLevel` its value
+  and silently reset heart speeds to level 0. Caught by a regression test that
+  existed for exactly that reason.
 * **Hearts are cleared above level 20.** Hard mode is `min(level + 10, 20)`, a
   ceiling written when 20 was the highest level; above it the clamp works
   *downward* and makes the game slower. Changing the formula would alter normal
