@@ -11,8 +11,23 @@
 ;                                            the `ds $100-@, $ff` padding that
 ;                                            sits between the serial interrupt
 ;                                            code and the $0100 entry point.
+;   GYM_GRAVITY_TABLE $000B-$0027        29  Extended 23-entry gravity table
+;                                            (levels 0-22), in the padding that
+;                                            follows the RST $08 vector.
+;   HOOK_GRAVITY_PTR  $1AFB-$1AFC         2  Operand of `ld hl, .framesData`,
+;                                            redirected to GymFramesData.
+;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
+;                                            so levelling up from an L or M
+;                                            start cannot run past the table.
 ;
 ; Nothing else in banks 0-1 may change.
+;
+; Note the shape of these: we redirect pointers and constants into space we
+; reclaimed, we never *insert* into the original banks. Inserting shifts every
+; byte after the insertion point - which is exactly why KLM is a 20KB binary
+; diff for a feature we express in 54 bytes.
 
 DEF HOOK_TRAMPOLINE_START EQU $00DA
 DEF HOOK_TRAMPOLINE_END   EQU $00FF
+DEF GYM_GRAVITY_START     EQU $000B
+DEF GYM_GRAVITY_END       EQU $0027

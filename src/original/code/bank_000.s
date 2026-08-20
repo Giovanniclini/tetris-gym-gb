@@ -15,6 +15,15 @@ ds $08-@, $00
 RST_08::
 	jp   Begin2                                                     ; $0008
 
+; --- tetris-gym-gb deviation #3 (see src/original/UPSTREAM.md) ---
+; Extended gravity table, placed in this 29-byte run of $ff padding so that
+; bank 0 does not have to shift. KLM extends the table by relocating it, which
+; moves every byte after it and is why that ROM is a 20KB binary diff.
+IF GYM
+INCLUDE "gym/gravity.inc"
+ENDC
+; --- end deviation #3 ---
+
 ds $28-@, $ff
 
 SECTION "RST $28", ROM0[$28]
@@ -1068,7 +1077,11 @@ SetNumFramesUntilPiecesMoveDown:
 
 .setTopSpeedForPieces:
 ; get num frames needed for a piece to move down from table idxed DE
+IF GYM
+	ld   hl, GymFramesData          ; deviation #3: 23 entries, levels 0-22
+ELSE
 	ld   hl, .framesData                                            ; $1afa
+ENDC
 	ld   d, $00                                                     ; $1afd
 	add  hl, de                                                     ; $1aff
 	ld   a, [hl]                                                    ; $1b00

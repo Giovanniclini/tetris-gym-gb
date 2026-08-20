@@ -34,3 +34,19 @@ jobs:
             exit 1
           fi
           echo "ok: no ROM data tracked"
+
+  behaviour:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build both ROMs
+        run: |
+          python3 build.py --original
+          python3 build.py
+      - name: Install the test-only emulator dependency
+        run: python3 -m pip install pyboy
+      - name: Behavioural tests
+        run: python3 tests/test_behaviour.py
