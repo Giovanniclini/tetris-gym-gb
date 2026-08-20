@@ -19,7 +19,7 @@ which remains copyrighted. See `docs/research.md` §7.
 
 ## Local deviations from upstream
 
-**None.** The tree builds byte-exactly as vendored.
+Two, both minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
 
 Only three categories of deviation are ever permitted, and every one must be
 listed in the table below with a justification (see `docs/architecture.md` §3.1):
@@ -34,7 +34,8 @@ listed in the table below with a justification (see `docs/architecture.md` §3.1
 
 | # | File | Change | Category | Why | Bytes changed |
 | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | — | — |
+| 1 | `code/bank_000.s` | `IF GYM` include of `hooks/trampoline.inc` immediately before `ds $100-@, $ff` | 3 (hook) | The entry-point padding at `$00DA-$00FF` is the only free space in bank 0. The far-call trampoline must live in bank 0 because the caller may execute from any bank. | 22 of 38 available, `$00DA-$00EF`. Zero when `GYM=0`. |
+| 2 | `include/wram.s` | Split the monolithic `$C000-$DFFC` section, starting a new `"WRAM Audio"` section at `$DF70` | 2 (section split) | Upstream declares all of WRAM as one section, so the linker cannot see the 2062-byte gap at `$D762-$DF6F` that the game never touches. No label moves. | **0** — WRAM is not in the ROM image |
 
 ## What was not vendored
 

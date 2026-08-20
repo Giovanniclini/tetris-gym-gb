@@ -37,6 +37,19 @@ UNITS = [
     ("hram", SRC / "include" / "hram.s"),
 ]
 
+# Gym translation units, added only when GYM=1.
+GYM_UNITS = [
+    ("gym", ROOT / "src" / "gym" / "gym.asm"),
+]
+
+# Cartridge header for the Gym build. The stock cartridge is ROM-ONLY with
+# ~51 usable free bytes, so expansion is arithmetic, not preference.
+# See docs/architecture.md D5/D9.
+MBC1_RAM_BATTERY = 0x03
+MBC1_NO_RAM = 0x01
+RAM_8KB = 0x02
+RAM_NONE = 0x00
+
 
 def run(cmd):
     proc = subprocess.run([str(c) for c in cmd], capture_output=True, text=True)
@@ -67,6 +80,8 @@ def main() -> int:
     ap.add_argument("--original", action="store_true",
                     help="build with GYM=0: must reproduce the stock ROM byte-exactly")
     ap.add_argument("--freespace", action="store_true", help="print per-bank free space")
+    ap.add_argument("--no-sram", action="store_true",
+                    help="build without cartridge RAM (cheaper board, no persistence)")
     args = ap.parse_args()
 
     gym = 0 if args.original else 1
@@ -83,11 +98,13 @@ def main() -> int:
     print("assemble:")
     OBJ.mkdir(parents=True, exist_ok=True)
     objs = []
-    for unit, path in UNITS:
+    units = UNITS + (GYM_UNITS if gym else [])
+    for unit, path in units:
         obj = OBJ / f"{unit}.o"
         run([tc / "rgbasm", "-h", "-L",
              "-D", f"GYM={gym}",
              "-I", str(SRC) + "/", "-I", str(OBJ) + "/",
+             "-I", str(ROOT / "src") + "/",
              "-o", obj, path])
         objs.append(obj)
 
@@ -97,14 +114,22 @@ def main() -> int:
 
     print("link:")
     run([tc / "rgblink", "-n", sym, "-m", mapf, "-w", "-o", rom, *objs])
-    run([tc / "rgbfix", "-v", "-p", "255", rom])
+    if gym:
+        mbc = MBC1_NO_RAM if args.no_sram else MBC1_RAM_BATTERY
+        ram = RAM_NONE if args.no_sram else RAM_8KB
+        run([tc / "rgbfix", "-v", "-p", "255",
+             "-m", hex(mbc), "-r", hex(ram), rom])
+    else:
+        run([tc / "rgbfix", "-v", "-p", "255", rom])
 
     data = rom.read_bytes()
     sha1 = hashlib.sha1(data).hexdigest()
     md5 = hashlib.md5(data).hexdigest()
-    print(f"\n{rom.relative_to(ROOT)}  {len(data)} bytes")
+    print(f"\n{rom.relative_to(ROOT)}  {len(data)} bytes ({len(data) // 1024}KB)")
     print(f"  sha1 {sha1}")
     print(f"  md5  {md5}")
+    print(f"  cart type ${data[0x147]:02X}  rom size ${data[0x148]:02X}  "
+          f"ram size ${data[0x149]:02X}")
 
     if args.freespace:
         freespace(mapf)

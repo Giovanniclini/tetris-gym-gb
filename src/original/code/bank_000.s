@@ -170,6 +170,15 @@ UnusedSerialFunc_clearIntFlagsIfSerialFunc2_2PlayerInGame:
 	ei                                                              ; $00d8
 	ret                                                             ; $00d9
 
+; --- tetris-gym-gb deviation #1 (see src/original/UPSTREAM.md) ---
+; This padding ($00DA-$00FF, 38 bytes of $ff) is the only place the Gym is
+; allowed to occupy in the original banks. Guarded so a GYM=0 build is
+; byte-identical to the stock ROM.
+IF GYM
+INCLUDE "hooks/trampoline.inc"
+ENDC
+; --- end deviation #1 ---
+
 ds $100-@, $ff
 
 Boot::

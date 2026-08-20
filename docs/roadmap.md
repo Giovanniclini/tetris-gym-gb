@@ -68,13 +68,23 @@ toolchain pinning; upstream issue #6.
    byte set equals the declared hook table (initially: the trampoline only).
 
 **Acceptance criteria**
-- [ ] Banks 0–1 differ from the reference **only** at the declared, enumerated addresses
-- [ ] `--original` still produces the byte-exact ROM (the `GYM=0` path is unaffected)
+- [x] Banks 0–1 differ from the reference **only** at the declared, enumerated addresses
+      (27 bytes: 22 trampoline + 3 header + 2 checksum), asserted by `tests/test_expansion.py`
+- [x] `--original` still produces the byte-exact ROM (the `GYM=0` path is unaffected)
+- [x] Cartridge is MBC1 + 8 KB battery SRAM; `--no-sram` variant also builds (D9)
+- [x] Banks 2–3 exist with ~16 KB free each; Gym WRAM claimed from the verified gap
 - [ ] `FarCall` into a stub in bank 2 and back works, verified in an emulator
-- [ ] SRAM is writable, readable, and **survives a power cycle on real hardware** (EverDrive GB or
-      EZ-Flash Junior)
-- [ ] Gameplay is indistinguishable: gravity, DAS, ARE and line-clear delay verified unchanged
-- [ ] Boots on DMG, Game Boy Pocket, Game Boy Color, SameBoy, BGB, Emulicious
+      *(trampoline assembled and byte-checked; execution needs the M1 harness)*
+- [ ] SRAM survives a power cycle on real hardware *(needs a flash cart)*
+- [ ] Gameplay is indistinguishable *(needs a human at an emulator)*
+- [ ] Boots on DMG, GBP, GBC, SameBoy, BGB, Emulicious
+
+**Status 2026-08-20: structurally complete, awaiting behavioural verification.**
+
+**ROM size revised to 64 KB (4 banks), not the 128 KB in D5.** Size the cartridge to what we
+actually use: banks 2–3 give ~32 KB of Gym space against a current usage of a few dozen bytes, and
+a smaller ROM is a cheaper cartridge — which matters, because the community intends to have carts
+produced (`docs/community-research.md` §3.5.7). Growing later is a one-line change.
 
 **Risks retired:** the single largest structural risk in the project. If MBC1 conversion breaks
 something subtle, we find out here — while the ROM is otherwise unmodified and the cause is

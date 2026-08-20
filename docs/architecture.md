@@ -154,16 +154,28 @@ FarCall::           ; in: b = target bank, hl = target address
 
 ### 4.1 WRAM
 
-The original leaves **≈4 527 bytes** of WRAM unused (`docs/research.md` §3.4). Gym state claims the
-two largest contiguous blocks and leaves the rest for future use:
+> **CORRECTED 2026-08-20.** An earlier draft of this section listed ~4.5 KB of free WRAM, including
+> `$C400–$C7FF`, taken from `meithecatte/gbtetris`'s memory map. That map simply declares no section
+> there. `vinheim3` — which we build from, and which has 100 % coverage — shows **`$C400–$C7FF` is
+> used** by `wDarkSolidBlocksUnderRandomBlocks`. Do not trust the old figures.
+
+The one large, **verified** free region is **`$D762–$DF6F` — 2 062 bytes** between the high-score
+tables and the audio variables. No code anywhere in the disassembly references an address in that
+range (checked by scanning every `$Dxxx` literal in `src/original/`).
 
 | Range | Size | Assigned to |
 | --- | --- | --- |
-| `$C400–$C7FF` | 1 024 B | **Gym core state** — active trainer, config, timer, statistics, HUD dirty flags |
-| `$D762–$DEFF` | 2 206 B | **Gym scratch** — savestate staging, generated piece tables, preset expansion |
-| `$C0CF–$C1FF` | 305 B | reserved |
-| `$C220–$C2FF` | 224 B | reserved |
-| `$CC00–$CEFF` | 768 B | reserved |
+| `$D800–$DBFF` | 1 024 B | **Gym core state** — active trainer, config, timer, statistics, HUD dirty flags |
+| `$D762–$D7FF` | 158 B | free |
+| `$DC00–$DF6F` | 880 B | free |
+
+Smaller unlabelled gaps exist lower in WRAM (`$C0DF–$C1FF`, and upstream notes that
+`wDemoOrMultiplayerPieces` at `$C300` is *"actually $30 in size"* despite reserving `$100`). **Treat
+them as used until proven otherwise** — the `$C400` mistake above is exactly how that goes wrong.
+
+Upstream declares WRAM as one monolithic section, so the linker reports no free space at all. The
+split that exposes the gap is deviation #2 in `src/original/UPSTREAM.md`; it moves no label and, since
+WRAM is not in the ROM image, cannot change output.
 
 **Rule: Gym code never writes outside its declared ranges.** A test asserts the Gym sections do not
 overlap any original section.
