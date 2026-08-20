@@ -14,11 +14,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.emu import Tetris, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
+from tools.emu import Tetris, sym, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
 
 ROM = "build/tetrisgym.gb"
-wGymRngLo, wGymRngHi = 0xD806, 0xD807
-wGymSeedLo, wGymSeedHi = 0xD808, 0xD809
+wGymRngLo, wGymRngHi = sym("wGymRngLo"), sym("wGymRngHi")
+wGymSeedLo, wGymSeedHi = sym("wGymSeedLo"), sym("wGymSeedHi")
 GS_IN_GAME_INIT = 0x0A
 hGymSpsEnabled = 0xFFFE
 hHiddenLoadedPiece = 0xFFAE

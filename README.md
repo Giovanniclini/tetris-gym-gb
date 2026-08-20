@@ -57,6 +57,7 @@ does not need competition.
 | **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
 | **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
 | **SPS** | A seed beside the level picker. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
+| **High scores per level** | `A-M` get their own slots, so the `TOP SCORE` panel tracks the level you are about to play |
 
 **Next**
 

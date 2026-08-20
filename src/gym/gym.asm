@@ -35,6 +35,10 @@ hGymSpsEnabled:: db
 ; between the high score tables and the audio variables. Verified unused - no
 ; code in the disassembly references an address in that range.
 ;
+; The first 351 bytes are not free after all: the original's own high score
+; indexing runs into them for levels above the grid. They are claimed below as
+; the continuation of that table, which is what they should always have been.
+;
 ; NOTE: $C400 is NOT free in v1.1 (wDarkSolidBlocksUnderRandomBlocks lives
 ; there). An earlier draft of docs/architecture.md said otherwise, based on a
 ; less complete disassembly's memory map.
@@ -42,7 +46,28 @@ hGymSpsEnabled:: db
 ; Gym code must never write outside this range.
 ; ---------------------------------------------------------------------------
 
-SECTION "Gym State", WRAM0[$D800]
+; ---------------------------------------------------------------------------
+; A-type high scores for levels A-M
+;
+; The original's table is ten slots - one per grid level - and its index
+; arithmetic (wATypeHighScores + level * HISCORE_SIZEOF, at $179A) has no bound
+; check. A game played at A-M therefore filed its score off the end of the
+; table, into whatever happened to be there.
+;
+; So put the missing slots there. This section continues the original table
+; exactly, which makes the original routine correct for levels 0-22 without
+; changing a byte of it. tests/test_menu.py asserts the two are contiguous.
+;
+; $D762 = wATypeHighScores + HISCORE_SIZEOF * 10. Written as a literal because
+; a SECTION address must be known at assembly time, not link time.
+; ---------------------------------------------------------------------------
+
+SECTION "Gym High Scores", WRAM0[$D762]
+wGymATypeHighScoresExt::
+	ds HISCORE_SIZEOF * (MAX_LEVEL + 1 - 10)
+
+
+SECTION "Gym State", WRAM0[$D8C1]
 wGymState::
 
 ; Level picker, shown in a single cell to the right of the original 0-9 grid.
@@ -71,9 +96,6 @@ wGymRngHi:: db
 ; must repeat the sequence rather than continue it.
 wGymSeedLo:: db
 wGymSeedHi:: db
-
-; Scratch for GymUpdateHighScores, which borrows hATypeLevel.
-wGymSavedGridLevel:: db
 
 	ds 1013
 wGymStateEnd::
@@ -223,18 +245,25 @@ GymLevelSelectInit::
 	ld   a, FOCUS_GRID
 	ld   [wGymFocus], a
 	ld   a, GRID_LAST + 1           ; a sensible first value to offer
-	jr   .storeLevel
+	ld   [wGymPickerLevel], a
+	jr   .pending
 
 .aboveGrid:
-	ld   b, a
+	ld   [wGymPickerLevel], a
 	ld   a, FOCUS_LEVEL
 	ld   [wGymFocus], a
+
+; A game just ended above the grid, and the original's init - which runs next -
+; files the score under whatever hATypeLevel says at that moment. It is about to
+; say GRID_LAST, so file the score here instead, while it still says the level
+; that was played. The routine clears wScoreBCD on its way out, so the
+; original's own call finds a zero score and cannot file it a second time.
+	call DisplayATypeHighScoresForLevel
+
 	ld   a, GRID_LAST
 	ldh  [hATypeLevel], a           ; keep the grid cursor somewhere valid
-	ld   a, b
 
-.storeLevel:
-	ld   [wGymPickerLevel], a
+.pending:
 	ld   a, 1
 	ld   [wGymRedrawPending], a
 	ret
@@ -260,6 +289,7 @@ GymLevelSelectMain::
 	xor  a
 	ld   [wGymRedrawPending], a
 	call GymDrawHearts
+	call GymUpdateHighScores        ; the original's init painted the grid level
 	call GymPaintFields
 
 .readInput:
@@ -595,38 +625,43 @@ GymBlankIfFocused::
 ;
 ; The original drives it from hATypeLevel, which the Gym keeps as the grid index
 ; while the level field or the seed has focus - so it kept showing the grid
-; cursor's scores while you had M selected.
+; cursor's scores while you had M selected. A-M have their own slots (see "Gym
+; High Scores" above), so every level shows real scores.
 ;
-; The high score table has ten slots, one per grid level; A-M have no storage at
-; all. For those the panel shows the dotted placeholder the original already
-; uses for empty entries, which is honest: there are no scores for that level.
+; This is DisplayATypeHighScoresForLevel ($1795) with one substitution: the
+; level comes from the picker instead of hATypeLevel. Borrowing hATypeLevel
+; instead would be shorter, but the routine below busy-waits on the LCD and so
+; can outlast a frame - leaving the borrowed value visible to everything else
+; that runs in between.
 GymUpdateHighScores::
-; The grid index is borrowed and must be put back. Saved in RAM rather than on
-; the stack: the routines called below are the original's, and relying on them
-; to leave the stack exactly as they found it is a bet worth not taking.
-	ldh  a, [hATypeLevel]
-	ld   [wGymSavedGridLevel], a
+	call DisplayDottedLinesForHighScore
 
 	ld   a, [wGymFocus]
 	and  a
-	jr   z, .showIt                 ; grid focus: hATypeLevel is already right
+	jr   nz, .fromPicker
+	ldh  a, [hATypeLevel]           ; grid focus: the cursor is the level
+	jr   .haveLevel
 
+.fromPicker:
 	ld   a, [wGymPickerLevel]
-	cp   10
-	jr   nc, .noScores
-	ldh  [hATypeLevel], a
 
-.showIt:
-	call DisplayATypeHighScoresForLevel
-	jr   .restore
+.haveLevel:
+	ld   hl, wATypeHighScores
+	ld   de, HISCORE_SIZEOF
 
-.noScores:
-	call DisplayDottedLinesForHighScore
+.nextSlot:
+	and  a
+	jr   z, .foundSlot
+	dec  a
+	add  hl, de
+	jr   .nextSlot
 
-.restore:
-	ld   a, [wGymSavedGridLevel]
-	ldh  [hATypeLevel], a
-	ret
+.foundSlot:
+	inc  hl                         ; highest byte of score 1
+	inc  hl
+	ld   d, h
+	ld   e, l
+	jp   SetNewHighScoreIfAchieved_SendNameAndScoreToRamBuffer
 
 
 ; Show whether hearts are armed, in the blank strip beside "LEVEL".

@@ -165,11 +165,15 @@ The one large, **verified** free region is **`$D762–$DF6F` — 2 062 bytes** b
 tables and the audio variables. No code anywhere in the disassembly references an address in that
 range (checked by scanning every `$Dxxx` literal in `src/original/`).
 
+Not *quite* free: the original's own high-score indexing runs past the end of its ten-slot table for
+any level above the grid, straight into `$D762`. Those 351 bytes are claimed as the continuation of
+that table rather than defended against — see `docs/decisions/0006`.
+
 | Range | Size | Assigned to |
 | --- | --- | --- |
-| `$D800–$DBFF` | 1 024 B | **Gym core state** — active trainer, config, timer, statistics, HUD dirty flags |
-| `$D762–$D7FF` | 158 B | free |
-| `$DC00–$DF6F` | 880 B | free |
+| `$D762–$D8C0` | 351 B | **A-type high scores, levels A–M** — 13 slots continuing `wATypeHighScores` |
+| `$D8C1–$DCC0` | 1 024 B | **Gym core state** — active trainer, config, timer, statistics, HUD dirty flags |
+| `$DCC1–$DF6F` | 687 B | free |
 
 Smaller unlabelled gaps exist lower in WRAM (`$C0DF–$C1FF`, and upstream notes that
 `wDemoOrMultiplayerPieces` at `$C300` is *"actually $30 in size"* despite reserving `$100`). **Treat
