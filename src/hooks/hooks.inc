@@ -21,6 +21,20 @@
 ;                                            init, $11 main), routed through
 ;                                            GymStateHook. The handlers
 ;                                            themselves are untouched.
+;   GYM_RESET_STUB    $0034-$003F        12  Far-call stub for instant restart,
+;                                            in the padding between the RST $28
+;                                            handler and the VBlank vector.
+;   HOOK_MAINLOOP_RST $02D3-$02D5         3  MainLoop's soft-reset `jp z, Reset`
+;                                            becomes `call z, GymResetStub`, so
+;                                            the Gym can decline and carry on.
+;   HOOK_INGAME_RST   $1C14-$1C15         2  Operand of the *other* soft-reset
+;                                            check, inside
+;                                            InGameCheckResetAndPause. This is
+;                                            the one that fires while playing.
+;   HOOK_STATE_TABLE4 $0303-$0304         2  Jump-table entry for $04, the
+;                                            end-of-game screen, so the reset
+;                                            combination is seen before that
+;                                            handler acts on Start.
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.

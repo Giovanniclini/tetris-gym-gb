@@ -19,7 +19,7 @@ which remains copyrighted. See `docs/research.md` §7.
 
 ## Local deviations from upstream
 
-Five, all minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
+Eight, all minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
 
 Only three categories of deviation are ever permitted, and every one must be
 listed in the table below with a justification (see `docs/architecture.md` §3.1):
@@ -39,6 +39,10 @@ listed in the table below with a justification (see `docs/architecture.md` §3.1
 | 3 | `code/bank_000.s` | `IF GYM` include of `gym/gravity.inc` into the `ds $28-@, $ff` padding, and the `ld hl, .framesData` operand redirected to it | 3 (hook) | Levels L (21) and M (22) need a 23-entry gravity table. Placing it in reclaimed padding and redirecting the pointer avoids shifting bank 0. KLM achieves the same feature by relocating the table, which moves every byte after it — 20 870 bytes changed versus our 25. | 23 (table) + 2 (pointer operand). Zero when `GYM=0`. |
 | 4 | `code/inGameFlow.s` | `IF GYM` raises the level-up cap from `$14` to `MAX_LEVEL` (`$16`) | 3 (hook) | With L and M selectable, a level-up from an L start would otherwise run past the end of the gravity table and read code as gravity values. **KLM has this bug** — it adds L and M but leaves the cap at `$14`. Latent (an L start needs ~220 lines to level up) but wrong. | 1. Zero when `GYM=0`. |
 | 5 | `code/bank_000.s` | `IF GYM` swaps two entries of `ProcessGameState`'s jump table (`$10` A-type select init, `$11` main) for `GymStateHook` | 3 (hook) | Routes the level-select screen through Gym code, which runs its own logic and then chains to the original handler. The handlers themselves are unmodified. | 4 (two `dw` entries). Zero when `GYM=0`. |
+
+| 6 | `code/bank_000.s` | `IF GYM` redirects the `jp z, Reset` inside `InGameCheckResetAndPause` to `GymResetStub`, and adds the stub to the `ds $40-@, $ff` padding | 3 (hook) | Instant restart. This is the reset check that fires while gameplay is ticking. | 2 (operand) + 8 (stub). Zero when `GYM=0`. |
+| 7 | `code/bank_000.s` | `IF GYM` turns MainLoop's `jp z, Reset` into `call z, GymResetStub` | 3 (hook) | The ROM has **two** soft-reset checks. The in-game one goes quiet during the restart's own init frames, and this one would reboot us a moment later. `call` so the Gym can decline. | 3. Zero when `GYM=0`. |
+| 8 | `code/bank_000.s` | `IF GYM` routes the `$04` jump-table entry (end-of-game screen) through `GymStateHook` | 3 (hook) | That handler treats Start as "back to the level select", and Start is part of the reset combination - so by the time either soft-reset check runs the state has moved on and we would reboot. Catching it here is what makes "top out, go again" work. | 2. Zero when `GYM=0`. |
 
 ## What was not vendored
 

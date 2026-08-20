@@ -9,3 +9,4 @@ choice would otherwise have to be re-derived — or, worse, silently reversed.
 | [2](0002-redirect-never-insert.md) | Hook by redirecting pointers, never by inserting bytes |
 | [3](0003-level-select-extends-the-original-screen.md) | Level select extends the original screen rather than adding a menu |
 | [4](0004-pyboy-for-behavioural-tests.md) | PyBoy drives behavioural tests; the build stays dependency-free |
+| [5](0005-instant-restart.md) | Instant restart hooks three places, not one |

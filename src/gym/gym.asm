@@ -52,7 +52,12 @@ wGymPickerDrawn::  db        ; what we last wrote, to avoid needless VRAM writes
 ; init runs, so anything we draw during init is erased. Repaint a frame later.
 wGymRedrawPending:: db
 
-	ds 1019
+; Set while an instant restart is in flight, so MainLoop's reset check knows to
+; leave it alone. Without it there is no way to tell our restart apart from the
+; level select starting a game, which reaches the same state.
+wGymRestarting:: db
+
+	ds 1018
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -87,6 +92,8 @@ GymInit::
 
 GymDispatch::
 	ldh  a, [hGameState]
+	cp   GS_LEVEL_ENDED_MAIN
+	jr   z, .levelEnded
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
 
@@ -102,6 +109,25 @@ GymDispatch::
 .init:
 	call GymLevelSelectInit
 	ld   hl, GameState10_ATypeSelectionInit
+	ret
+
+; The end-of-game screen. Its handler treats Start as "back to the level
+; select", and Start is part of the reset combination - so by the time either
+; soft-reset check runs, the state has already moved on and we would reboot.
+; Catch the combination here instead, which is what makes "top out, go again"
+; work.
+.levelEnded:
+	ldh  a, [hButtonsHeld]
+	and  PADF_START|PADF_SELECT|PADF_B|PADF_A
+	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A
+	jr   nz, .runLevelEnded
+
+	call GymInGameReset             ; state is GS_LEVEL_ENDED_MAIN: restarts
+	ld   hl, Stub_148c
+	ret
+
+.runLevelEnded:
+	ld   hl, GameState04_LevelEndedMain
 	ret
 
 
@@ -369,4 +395,75 @@ GymDrawHearts::
 
 	ld   a, b
 	ld   [HEART_CELL], a
+	ret
+
+
+; ---------------------------------------------------------------------------
+; Instant restart
+;
+; The original treats A+B+Select+Start during play as a reboot: back through
+; the Nintendo logo, two copyright screens, the title, the game type menu and
+; the level select. Fifteen-odd seconds to get back to the drill you were on.
+;
+; Restart the game instead, at the same level and hearts, by dropping the state
+; machine into GS_IN_GAME_INIT - exactly what the level select does when you
+; press Start.
+;
+; Note there are *two* soft-reset checks in the ROM: this one inside
+; InGameCheckResetAndPause, which fires while playing, and another in MainLoop
+; that runs immediately afterwards. Hooking only one is not enough - the other
+; reboots a moment later - so the buttons are consumed here.
+; ---------------------------------------------------------------------------
+
+GymInGameReset::
+; Link play still reboots: restarting one side of a two-player game would
+; desync the cable, and the original behaviour is the safe one there.
+	ldh  a, [hIs2Player]
+	and  a
+	jp   nz, Reset
+
+; A restart we started is still initialising: decline, and let it finish.
+	ld   a, [wGymRestarting]
+	and  a
+	jr   z, .notRestarting
+
+	ldh  a, [hGameState]
+	cp   GS_IN_GAME_INIT
+	jr   z, .consume
+
+	xor  a                          ; init finished
+	ld   [wGymRestarting], a
+
+.notRestarting:
+; Restart from anywhere inside a game or its aftermath. Topping out and going
+; straight again is the case a trainer needs most, and the game-over sequence
+; runs $00 -> $01 -> $0D -> $04 before it settles.
+	ldh  a, [hGameState]
+	and  a
+	jr   z, .restart                ; GS_IN_GAME_MAIN
+	cp   GS_GAME_OVER_INIT
+	jr   z, .restart
+	cp   GS_LEVEL_ENDED_MAIN
+	jr   z, .restart
+	cp   GS_GAME_OVER_SCREEN_CLEARING
+	jr   z, .restart
+
+; Anywhere else, reboot exactly as the original does. Note this includes
+; GS_IN_GAME_INIT reached from the level select, which is what happens when the
+; combination is pressed on a menu - Start is part of it, so the menu starts a
+; game on the way past. Only a restart we began is exempt, hence the flag.
+	jp   Reset
+
+.restart:
+	ld   a, GS_IN_GAME_INIT
+	ldh  [hGameState], a
+	ld   a, 1
+	ld   [wGymRestarting], a
+
+; Consume the combination. MainLoop's check runs later in this same frame, and
+; during the restart's init frames it is the only one that runs at all.
+; PollInput refills hButtonsHeld next frame.
+.consume:
+	xor  a
+	ldh  [hButtonsHeld], a
 	ret

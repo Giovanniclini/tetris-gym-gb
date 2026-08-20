@@ -41,6 +41,12 @@ JumpTable::
 	pop  hl                                                         ; $0032
 	jp   hl                                                         ; $0033
 
+; --- tetris-gym-gb deviation #7 (continued) ---
+IF GYM
+INCLUDE "gym/softreset.inc"
+ENDC
+; --- end deviation #7 ---
+
 ds $40-@, $ff
 
 VBlankInterrupt::
@@ -559,7 +565,17 @@ MainLoop:
 	ldh  a, [hButtonsHeld]                                          ; $02cd
 	and  PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $02cf
 	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $02d1
+; --- tetris-gym-gb deviation #8 (see src/original/UPSTREAM.md) ---
+; The ROM has two soft-reset checks. This one runs every frame; the other is
+; inside InGameCheckResetAndPause and only runs while gameplay is ticking, so
+; it goes quiet during the restart's init frames and this one would reboot us.
+; `call` rather than `jp` so the Gym can decline and let the loop carry on.
+IF GYM
+	call z, GymResetStub
+ELSE
 	jp   z, Reset                                                   ; $02d3
+ENDC
+; --- end deviation #8 ---
 
 ; decrease 2 timers
 	ld   hl, hTimers                                                ; $02d6
@@ -604,7 +620,15 @@ ProcessGameState:
 	dw GameState01_GameOverInit
 	dw GameState02_ShuttleSceneLiftoff
 	dw GameState03_ShuttleSceneShootFire
+; --- tetris-gym-gb deviation #9 (see src/original/UPSTREAM.md) ---
+; Routed through the Gym so the reset combination is seen before this handler
+; acts on Start and walks off to the level select.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState04_LevelEndedMain
+ENDC
+; --- end deviation #9 ---
 	dw GameState05_BTypeLevelFinished
 	dw GameState06_TitleScreenInit
 	dw GameState07_TitleScreenMain
@@ -1322,7 +1346,18 @@ InGameCheckResetAndPause:
 	ldh  a, [hButtonsHeld]                                          ; $1c0d
 	and  PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $1c0f
 	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $1c11
+; --- tetris-gym-gb deviation #7 (see src/original/UPSTREAM.md) ---
+; Gameplay has its own reset check, separate from the one in MainLoop, and this
+; is the one that fires while playing. Restart the drill here instead of
+; rebooting. Still a `jp`: the handler's `ret` unwinds to whoever called
+; `.start`, which skips the pause check below - Start is part of the
+; combination, so returning normally would pause the new game immediately.
+IF GYM
+	jp   z, GymResetStub
+ELSE
 	jp   z, Reset                                                   ; $1c13
+ENDC
+; --- end deviation #7 ---
 
 ; return if demo
 	ldh  a, [hPrevOrCurrDemoPlayed]                                 ; $1c16

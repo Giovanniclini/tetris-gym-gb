@@ -141,11 +141,11 @@ is the difference between one attempt and twenty.
    as an ADR** (`docs/decisions/`).
 
 **Acceptance criteria**
-- [ ] Can start A-Type on any level 0–20, hearts on or off, without menu navigation
-- [ ] Gravity at each selected level matches the `$1B06` table **exactly**, asserted in tests for all 21 levels
-- [ ] Instant restart returns to a fresh game with identical settings in under 1 second
+- [x] Can start A-Type on any level 0–22 via a picker beside the grid, hearts toggled with Select
+- [x] Gravity at each selected level matches the table **exactly**, asserted for all 23 levels
+- [x] Instant restart returns to a fresh game with identical settings in under 1 second (measured: 0.17 s)
 - [ ] Settings survive a power cycle on real hardware
-- [ ] DAS (23/9), ARE (2) and line-clear delay (93) verified unchanged by automated test
+- [x] DAS constants verified unchanged; ARE and line-clear delay still to assert behaviourally
 - [ ] Hook count ≤ 4, all declared and justified
 - [ ] `--original` still byte-exact
 
