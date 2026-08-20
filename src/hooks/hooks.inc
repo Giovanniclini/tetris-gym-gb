@@ -35,6 +35,16 @@
 ;                                            end-of-game screen, so the reset
 ;                                            combination is seen before that
 ;                                            handler acts on Start.
+;   HOOK_RNG_PIECE    $2043-$2045         3  `ldh a,[rDIV] / ld b,a` in the
+;                                            piece generator becomes
+;                                            `call GymRandom` - three bytes for
+;                                            three, so nothing shifts.
+;   HOOK_RNG_BTYPE    $1B6F-$1B71         3  The same substitution for B-type's
+;                                            starting garbage.
+;   GYM_RANDOM        $7FC6-$7FEF        42  The LFSR itself, in the empty space
+;                                            between the sound engine and the
+;                                            sound thunks in bank 1. A new
+;                                            section in a gap, not an insertion.
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.

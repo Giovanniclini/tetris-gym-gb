@@ -58,6 +58,7 @@ jobs:
           python3 tests/test_behaviour.py
           python3 tests/test_menu.py
           python3 tests/test_restart.py
+          python3 tests/test_sps.py
 
       # Patches only, never ROM data. See docs/research.md section 7.
       - name: Assert no ROM data is tracked

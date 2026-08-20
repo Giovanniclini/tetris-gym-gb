@@ -1185,8 +1185,15 @@ PopulateGameScreenWithRandomBlocks:
 
 .mainLoop:
 ; random val in B
+; --- tetris-gym-gb deviation #10 (continued) ---
+; B-type's starting garbage draws from the same source, so it is seeded too.
+IF GYM
+	call GymRandom
+ELSE
 	ldh  a, [rDIV]                                                  ; $1b6f
 	ld   b, a                                                       ; $1b71
+ENDC
+; --- end deviation #10 ---
 
 .fromWasTileEmpty:
 	ld   a, TILE_PIECE_SQUARES_START                                ; $1b72

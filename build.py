@@ -40,6 +40,7 @@ UNITS = [
 # Gym translation units, added only when GYM=1.
 GYM_UNITS = [
     ("gym", ROOT / "src" / "gym" / "gym.asm"),
+    ("gym_random", ROOT / "src" / "gym" / "random.asm"),
 ]
 
 # Cartridge header for the Gym build. The stock cartridge is ROM-ONLY with

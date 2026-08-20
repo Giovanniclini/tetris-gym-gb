@@ -25,6 +25,9 @@ INCLUDE "gym/levels.inc"
 SECTION "Gym HRAM", HRAM[$FFFD]
 hGymBank:: db            ; ROM bank currently selected by FarCall
 
+; Read once per piece draw, so it earns one of the two free HRAM bytes.
+hGymSpsEnabled:: db
+
 ; ---------------------------------------------------------------------------
 ; WRAM
 ;
@@ -57,7 +60,13 @@ wGymRedrawPending:: db
 ; level select starting a game, which reaches the same state.
 wGymRestarting:: db
 
-	ds 1018
+; SPS state. Sixteen bits, low byte first, matching the community's seeded ROM.
+; $0000 is degenerate - period 1, always returns zero - so seeds are forced
+; non-zero when set. See docs/existing-hacks.md section 4.2.
+wGymRngLo:: db
+wGymRngHi:: db
+
+	ds 1016
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -466,4 +475,36 @@ GymInGameReset::
 .consume:
 	xor  a
 	ldh  [hButtonsHeld], a
+	ret
+
+
+; ---------------------------------------------------------------------------
+; SPS seed
+; ---------------------------------------------------------------------------
+
+; Arm SPS with the seed in DE. $0000 is a degenerate LFSR state - period 1,
+; every draw returns zero - so it is nudged to $0001. The community's seeded ROM
+; offers $0000 as its default and does not guard it, which may be part of why it
+; is described as "not perfect SPS". See docs/existing-hacks.md 4.2.
+GymSetSeed::
+	ld   a, d
+	or   e
+	jr   nz, .store
+	ld   d, 0
+	ld   e, 1
+
+.store:
+	ld   a, e
+	ld   [wGymRngLo], a
+	ld   a, d
+	ld   [wGymRngHi], a
+	ld   a, 1
+	ldh  [hGymSpsEnabled], a
+	ret
+
+
+; Turn SPS off: pieces come from rDIV again, exactly as the original does.
+GymClearSeed::
+	xor  a
+	ldh  [hGymSpsEnabled], a
 	ret

@@ -61,8 +61,18 @@ PlayNextPieceLoadNextAndHiddenPiece:
     ld   h, $03                                                  ; $2041
 
 .upToDIV:
+; --- tetris-gym-gb deviation #10 (see src/original/UPSTREAM.md) ---
+; SPS. Three bytes for three, so nothing shifts. GymRandom returns the value in
+; B exactly as these two instructions did, and returns rDIV unchanged when SPS
+; is off. Everything downstream - the counting loop, the OR-rejection retry and
+; its bias - is untouched.
+IF GYM
+    call GymRandom
+ELSE
     ldh  a, [rDIV]                                               ; $2043
     ld   b, a                                                    ; $2045
+ENDC
+; --- end deviation #10 ---
 
 .xorAloop:
     xor  a                                                       ; $2046
