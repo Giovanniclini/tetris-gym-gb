@@ -24,6 +24,7 @@ ALLOWED_RANGES = [
     (0x02D3, 0x02D5, "HOOK_MAINLOOP_RST - MainLoop reset check routed via the Gym"),
     (0x0303, 0x0304, "HOOK_STATE_TABLE_04 - level-ended state routed via the Gym"),
     (0x031B, 0x031E, "HOOK_STATE_TABLE - A-type selection states routed via the Gym"),
+    (0x0325, 0x0326, "HOOK_STATE_TABLE_15 - name entry routed via the Gym"),
     (0x1B6F, 0x1B71, "HOOK_RNG_BTYPE - B-type garbage draw routed via GymRandom"),
     (0x1C14, 0x1C15, "HOOK_INGAME_RST - in-game reset check routed via the Gym"),
     (0x2043, 0x2045, "HOOK_RNG_PIECE - piece generator draw routed via GymRandom"),

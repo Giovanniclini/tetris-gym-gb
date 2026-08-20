@@ -16,10 +16,11 @@ During a game or its aftermath, restart at the same level and hearts by setting
 press Start. Everywhere else, reboot as the original does. Link play always
 reboots: restarting one side would desync the cable.
 
-## Why three hooks
+## Why four hooks
 
 This looked like a one-byte change and was not. Each hook exists because a
-different piece of the original gets to the buttons first.
+different piece of the original gets to the buttons first - and Start being part
+of the combination is what makes almost all of them necessary.
 
 1. **`InGameCheckResetAndPause` (`$1C14`)** - gameplay has its *own* reset
    check, separate from MainLoop's, and it is the one that fires while playing.
@@ -28,11 +29,13 @@ different piece of the original gets to the buttons first.
    check goes quiet during the restart's own init frames, so this one would
    reboot us a moment later. Hooked with `call` rather than `jp` so the Gym can
    decline and let the loop carry on.
-3. **The `$04` jump-table entry** - the end-of-game screen treats Start as "back
-   to the level select", and Start is part of the combination. By the time
-   either reset check runs, the state has already moved to `$10` and we would
-   reboot. Catching it in the state dispatch is what makes "top out, go again"
-   work - the case a trainer needs most.
+3. **Jump-table entries for the screens that consume Start themselves** - `$04`
+   end-of-game and `$15` name entry. Both treat Start as "move on", and Start is
+   part of the combination, so by the time either reset check runs the state has
+   already changed and we would reboot. Catching them in the state dispatch is
+   what makes "top out, go again" work - the case a trainer needs most.
+4. **The level select (`$11`)**, for the same reason in reverse: there Start
+   *should not* be acted on, so it is suppressed while the combination is held.
 
 ## Consequences
 
@@ -47,9 +50,15 @@ different piece of the original gets to the buttons first.
   `.start`, which skips the pause check sitting directly after the reset check -
   Start is part of the combination, so returning normally would pause the game
   we just restarted.
-* Restart covers `$00` playing, `$01` game-over init, `$0D` screen clearing and
-  `$04` end-of-game. High-score entry is deliberately left alone so scores can
-  still be entered.
+* **Restart covers a game and everything downstream of it**: `$00` playing,
+  `$01` game-over init, `$0D` screen clearing, `$04` end-of-game and `$15` high
+  score name entry. Abandoning a half-typed name is the point - when you are
+  drilling you want another go, not a leaderboard entry.
+* **Menus reboot, and must not start a game first.** Start is part of the
+  combination, so the level select would act on it, start a game, and have that
+  game rebooted a frame later - visible as a flash of gameplay. The stock ROM
+  genuinely does this; the Gym suppresses Start while the combination is held,
+  which makes it better-behaved than the original here.
 * **You get the level you chose, not the level you reached.** `hATypeLevel`
   (`$FFC2`) holds the menu choice and is never written during play;
   `hATypeLinesThresholdToPassForNextLevel` (`$FFA9`) is the live level and

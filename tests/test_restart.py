@@ -100,9 +100,7 @@ def test_restart_does_not_leave_the_game_paused():
 
 
 def test_menus_still_reboot():
-    """Only gameplay restarts. Everywhere else the combination must do what
-    players expect, including on the level select - where Start is part of the
-    combination, so the menu starts a game on the way past."""
+    """Only a game and its aftermath restart. Menus reboot, as the original does."""
     with Tetris(ROM) as t:
         t.to_level_select()
         t.tick(10)
@@ -112,6 +110,49 @@ def test_menus_still_reboot():
             if t.state == GS_TITLE_SCREEN_MAIN:
                 return
         raise AssertionError(f"never rebooted (state ${t.state:02X})")
+
+
+def test_the_level_select_does_not_start_a_game_on_the_way_to_rebooting():
+    """Start is part of the combination, so the menu would act on it and start a
+    game that is rebooted a frame later - visible as a flash of gameplay. The
+    Gym suppresses Start while the combination is held.
+
+    Stock genuinely does this, so the assertion is that we are better than it.
+    """
+    def states_while_held(rom):
+        with Tetris(rom) as t:
+            t.to_level_select()
+            t.tick(10)
+            for b in COMBO:
+                t.pb.button_press(b)
+            seen = set()
+            for _ in range(40):
+                t.tick(1)
+                seen.add(t.state)
+            return seen
+
+    GS_IN_GAME_INIT = 0x0A
+    assert GS_IN_GAME_INIT in states_while_held("build/tetris.gb"), (
+        "expected stock to start a game here; if not, this test proves nothing"
+    )
+    assert GS_IN_GAME_INIT not in states_while_held(ROM), (
+        "the Gym started a game on the level select before rebooting"
+    )
+
+
+def test_restart_from_the_high_score_name_entry():
+    """Abandoning the score is the point: when drilling you want another go."""
+    GS_ENTERING_HIGH_SCORE = 0x15
+    with Tetris(ROM) as t:
+        t.start_game_at(9)
+        t.tick(60)
+        t.pb.memory[0xFFE1] = GS_ENTERING_HIGH_SCORE
+        t.tick(20)
+        assert t.state == GS_ENTERING_HIGH_SCORE
+        combo(t)
+        frames = wait_playing(t)
+        assert frames < REBOOT_FRAMES / 4, f"took {frames} frames"
+        assert t[hATypeLevel] == 9
 
 
 def test_original_build_still_reboots_from_gameplay():

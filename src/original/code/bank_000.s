@@ -655,7 +655,15 @@ ENDC
 	dw GameState12_BTypeSelectionInit
 	dw GameState13_BTypeSelectionMain
 	dw GameState14_BTypeHighMain
+; --- tetris-gym-gb deviation #11 (see src/original/UPSTREAM.md) ---
+; Routed through the Gym so the reset combination restarts the drill from the
+; name entry screen rather than rebooting.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState15_EnteringHighScore
+ENDC
+; --- end deviation #11 ---
 	dw GameState16_MarioLuigiScreenInit
 	dw GameState17_MarioLuigiScreenMain
 	dw GameState18_2PlayerInGameInit
