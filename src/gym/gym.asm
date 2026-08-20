@@ -9,9 +9,6 @@ INCLUDE "include/structs.s"     ; rb offsets, likewise
 
 INCLUDE "gym/levels.inc"
 
-DEF TILE_HEART          EQU $27
-DEF TILE_BLANK_CELL     EQU $2f
-DEF TILE_LEVEL_ROW_BLANK EQU $2c ; what the original draws there
 
 ; hram.s declares a real SECTION, so it cannot be included twice. Its labels
 ; are exported and resolve at link time; these are the ones we use.
@@ -45,18 +42,15 @@ hGymBank:: db            ; ROM bank currently selected by FarCall
 SECTION "Gym State", WRAM0[$D800]
 wGymState::
 
-; Which block of ten levels the cursor is showing: 0 = 0-9, 1 = A-J, 2 = K-M.
-wGymLevelBank:: db
+; Level picker, shown in a single cell to the right of the original 0-9 grid.
+wGymPickerActive:: db        ; non-zero while the picker has focus
+wGymPickerLevel::  db        ; 0-22, shown as 0-9 then A-M
+wGymPickerBlink::  db        ; frame counter for the focus blink
+wGymPickerDrawn::  db        ; what we last wrote, to avoid needless VRAM writes
 
-; Set on entering the level select screen. The original's init copies the whole
-; layout back over the screen after we run, so the Gym's cells and hearts
-; indicator have to be painted on the frame after, not during init.
+; The original's init copies the whole layout back over the screen after our
+; init runs, so anything we draw during init is erased. Repaint a frame later.
 wGymRedrawPending:: db
-
-; Blink state for the selected cell on letter banks.
-wGymBlinkTimer:: db
-wGymBlinkPhase:: db
-wGymBlinkCell::  db          ; $ff = no cell currently blanked
 
 	ds 1019
 wGymStateEnd::
@@ -111,54 +105,69 @@ GymDispatch::
 	ret
 
 
-; Entering the level select screen.
+
+
+; ---------------------------------------------------------------------------
+; Level picker
 ;
-; hATypeLevel may hold a real level 0-22 (set when a game was last started).
-; The original cursor code only understands 0-9, so split it into a bank and a
-; cursor index, and hand the original the index it expects.
+; The original 0-9 grid is left completely alone - same tiles, same cursor,
+; same movement. All the Gym adds is one cell to the right of it showing a
+; level, changed with Left and Right.
+;
+; Pressing Right on cell 9 gives the picker focus; the original ignores that
+; press (`cp $09 / jr z`), so nothing needs suppressing to reach it. Pressing
+; Left at level 0 hands focus back to cell 9.
+;
+; The picker cell's tile is simply the level number: the font puts 0-9 at
+; $00-$09 and A-M at $0A-$16, so tile == level for every level we support.
+; ---------------------------------------------------------------------------
+
+DEF PICKER_CELL   EQU _SCRN0 + 6 * 32 + 16
+DEF HEART_CELL    EQU _SCRN0 + 4 * 32 + 14
+DEF TILE_HEART    EQU $27
+DEF TILE_FRAME    EQU $2c       ; what the original draws in the heart cell
+DEF GRID_LAST     EQU 9       ; bottom-right cell of the original grid
+DEF PICKER_BLANK  EQU $2f
+
+
 GymLevelSelectInit::
+; hATypeLevel may hold a level above the grid, set last time a game started.
+; Give the picker focus in that case, otherwise leave the grid in charge.
 	ldh  a, [hATypeLevel]
-	ld   b, 0
+	cp   GRID_LAST + 1
+	jr   nc, .abovegrid
 
-.splitLoop:
-	cp   10
-	jr   c, .splitDone
-	sub  10
-	inc  b
-	jr   .splitLoop
+	xor  a
+	ld   [wGymPickerActive], a
+	ld   a, GRID_LAST + 1           ; a sensible first value to offer
+	jr   .storePicker
 
-.splitDone:
-	ldh  [hATypeLevel], a
+.abovegrid:
+	ld   b, a
+	ld   a, 1
+	ld   [wGymPickerActive], a
+	ld   a, GRID_LAST
+	ldh  [hATypeLevel], a           ; keep the grid cursor somewhere valid
 	ld   a, b
-	ld   [wGymLevelBank], a
 
+.storePicker:
+	ld   [wGymPickerLevel], a
+
+	ld   a, $ff
+	ld   [wGymPickerDrawn], a       ; force the first paint
 	ld   a, 1
 	ld   [wGymRedrawPending], a
-	; fall through
-
-; Clear the blink so a stale blanked cell cannot survive into a repaint.
-GymResetBlink::
-	ld   a, $10                     ; phase on
-	ld   [wGymBlinkPhase], a
-	ld   a, $ff                     ; no cell blanked
-	ld   [wGymBlinkCell], a
 	ret
 
 
-; One frame of the level select screen. Runs before the original handler.
-;
-; Acts only on inputs the original ignores here, so nothing needs suppressing:
-;   - Down on the bottom row / Up on the top row: the original explicitly
-;     ignores these (`cp $05 / jr nc`), we use them to cycle the level bank
-;   - Select: the original never tests it on this screen
 GymLevelSelectMain::
-; Repaint once, on the frame after the original init has drawn the layout.
 	ld   a, [wGymRedrawPending]
 	and  a
 	jr   z, .readInput
 	xor  a
 	ld   [wGymRedrawPending], a
-	call GymRedrawLevelScreen
+	call GymDrawHearts
+	call GymDrawPicker
 
 .readInput:
 	ldh  a, [hButtonsPressed]
@@ -166,320 +175,198 @@ GymLevelSelectMain::
 
 ; Select toggles hard mode ("hearts"). The original arms it with an
 ; undocumented Down+Start on the title screen, two screens earlier, with no
-; feedback until a heart appears here. It never tests Select on this screen.
-; Hearts are min(level + 10, 20). That ceiling was written when 20 was the
-; highest level, so at K, L or M it clamps *downward* - M with hearts drops
-; from 1 frame per row to 3, making hearts three times slower. Rather than
-; touch the original formula, which normal heart games rely on, we simply do
-; not offer hearts where they cannot help: at K, L and M the speed already
-; meets or exceeds anything hearts could add.
-	ld   a, [wGymLevelBank]
-	cp   GYM_LEVEL_BANKS - 1
-	jr   z, .skipHearts
-
+; feedback until a heart appears here; it never tests Select on this screen.
 	bit  PADB_SELECT, c
-	jr   nz, .toggleHearts
+	jr   z, .afterSelect
 
-.skipHearts:
-
-	ld   a, [wGymLevelBank]
-	cp   GYM_LEVEL_BANKS - 1
-	jr   z, .topBankKeys
-
-; Banks 0 and 1 fill all ten cells. Down on the bottom row and Up on the top
-; row are both explicitly ignored by the original (`cp $05 / jr nc`), so we can
-; use them to cycle banks. Every other movement is left to the original.
-	ldh  a, [hATypeLevel]
-	ld   e, a
-
-	bit  PADB_DOWN, c
-	jr   z, .checkUp
-	ld   a, e
-	cp   5
-	ret  c                          ; not on the bottom row
-
-; Falling off the bottom of one bank lands on the *top* row of the next, so
-; Down keeps reading as "keep going down" rather than dumping you back on the
-; bottom row you just left.
-	sub  5
-	ldh  [hATypeLevel], a
-	jr   .bankNext
-
-.checkUp:
-	bit  PADB_UP, c
-	ret  z
-	ld   a, e
-	cp   5
-	ret  nc                         ; not on the top row
-
-	add  5                          ; and Up lands on the bottom row above
-	ldh  [hATypeLevel], a
-	jr   .bankPrev
-
-; The K-M bank has only three cells, all on the top row, so vertical movement
-; has nothing to move to and always cycles. Right must stop at M, which the
-; original would otherwise walk past into empty cells.
-.topBankKeys:
-	bit  PADB_DOWN, c
-	jr   nz, .bankNext
-	bit  PADB_UP, c
-	jr   nz, .bankPrev
-
-	ret                             ; Left/Right are clamped by the post-pass
-
-.toggleHearts:
 	ldh  a, [hIsHardMode]
 	and  a
 	ld   a, 0
-	jr   nz, .storeHardMode
+	jr   nz, .storeHearts
 	ld   a, 1
 
-.storeHardMode:
+.storeHearts:
 	ldh  [hIsHardMode], a
-	jp   GymRedrawLevelScreen
+	call GymDrawHearts
 
-.bankNext:
-	ld   a, [wGymLevelBank]
-	inc  a
-	cp   GYM_LEVEL_BANKS
-	jr   c, .setBank
-	xor  a
-	jr   .setBank
-
-.bankPrev:
-	ld   a, [wGymLevelBank]
+.afterSelect:
+	ld   a, [wGymPickerActive]
 	and  a
-	jr   nz, .decBank
-	ld   a, GYM_LEVEL_BANKS
+	jr   nz, .picker
 
-.decBank:
-	dec  a
-
-.setBank:
-	ld   [wGymLevelBank], a
-
-	cp   GYM_LEVEL_BANKS - 1
-	jr   nz, .afterClamp
-
-; Hearts cannot help at K-M, so clear them on arrival - unconditionally, not
-; only when the cursor also needs clamping. Landing on cell 0 needs no clamp,
-; which is how hearts survived into K-M before.
-	xor  a
-	ldh  [hIsHardMode], a
-
-; Pull the cursor back if it is parked beyond M.
+; --- grid has focus: the only thing we add is Right on the last cell ---
+	bit  PADB_RIGHT, c
+	ret  z
 	ldh  a, [hATypeLevel]
-	cp   GYM_TOP_BANK_COUNT
-	jr   c, .afterClamp
-	ld   a, GYM_TOP_BANK_COUNT - 1
-	ldh  [hATypeLevel], a
+	cp   GRID_LAST
+	ret  nz
 
-.afterClamp:
-	call GymResetBlink
-	call .consumeMovement
-	ld   a, SND_MOVING_SELECTION
-	ld   [wSquareSoundToPlay], a
-	jp   GymRedrawLevelScreen
+	ld   a, 1
+	ld   [wGymPickerActive], a
+	jr   .consume
 
-; We have consumed this press. Without clearing it the original handler would
-; act on it too - after clamping the cursor to K it would see a top-row cursor
-; and move it straight down a row, into an empty cell.
-.consumeMovement:
+; --- picker has focus ---
+.picker:
+	bit  PADB_RIGHT, c
+	jr   z, .checkLeft
+
+	ld   a, [wGymPickerLevel]
+	cp   MAX_LEVEL
+	jr   nc, .consume               ; already at M
+	inc  a
+	ld   [wGymPickerLevel], a
+	jr   .consume
+
+.checkLeft:
+	bit  PADB_LEFT, c
+	jr   z, .swallowVertical
+
+	ld   a, [wGymPickerLevel]
+	and  a
+	jr   nz, .decLevel
+
+; at level 0: hand focus back to the grid
+	ld   [wGymPickerActive], a      ; a is already 0
+	call GymShowGridCursor
+	jr   .consume
+
+.decLevel:
+	dec  a
+	ld   [wGymPickerLevel], a
+	jr   .consume
+
+; Up and Down would move the grid cursor underneath the picker, so ignore them
+; while the picker has focus.
+.swallowVertical:
+	bit  PADB_UP, c
+	jr   nz, .consumeQuietly
+	bit  PADB_DOWN, c
+	ret  z
+
+.consumeQuietly:
 	ldh  a, [hButtonsPressed]
 	res  PADB_UP, a
 	res  PADB_DOWN, a
 	ldh  [hButtonsPressed], a
 	ret
 
+.consume:
+	ldh  a, [hButtonsPressed]
+	res  PADB_LEFT, a
+	res  PADB_RIGHT, a
+	ldh  [hButtonsPressed], a
+	ld   a, SND_MOVING_SELECTION
+	ld   [wSquareSoundToPlay], a
+	jp   GymDrawPicker
 
-; Runs after the original handler, which is the only point at which the cursor
-; sprite can be corrected - the original positions it on its own terms.
-;
-; Two jobs:
-;   1. Keep the cursor inside K, L and M, and move the sprite to match.
-;   2. On letter banks, hide the sprite and blink the letter instead. The
-;      cursor sprite draws the *character* for the level ($20 + level selects a
-;      one-tile sprite spec), and the ROM only has those specs for digits 0-9 -
-;      so on a letter bank it draws a digit over the letter. Adding letter
-;      sprites would mean extending SpriteData, which shifts bank 0, so we
-;      blink the background cell instead.
+
+; Runs after the original handler.
 GymLevelSelectPost::
 	ldh  a, [hGameState]
 	cp   GS_A_TYPE_SELECTION_MAIN
 	jr   nz, .leavingScreen
 
-	ld   a, [wGymLevelBank]
+	ld   a, [wGymPickerActive]
 	and  a
-	jr   nz, .letterBank
+	ret  z                          ; grid has focus: nothing to correct
 
-; digit bank: the original behaviour is already right, just undo any blink
-	ld   a, [wGymBlinkCell]
-	inc  a
-	ret  z                          ; $ff = nothing blanked
-	xor  a
-	dec  a
-	ld   [wGymBlinkCell], a
-	ret
-
-; The original has handed over - to the game, or back a screen. hATypeLevel has
-; been holding a cursor index so the original cursor code kept working; now
-; that nothing else will read it as an index, fold the bank in.
-;
-; This has to happen *after* the original handler, not before it. Doing it
-; first meant the clamp below saw a real level rather than a cursor index and
-; pulled level 21 back to 2.
-.leavingScreen:
-	ld   a, [wGymLevelBank]
-	and  a
-	ret  z                          ; bank 0: the cursor already is the level
-
-	ld   b, a
-	ldh  a, [hATypeLevel]
-
-.addTens:
-	add  10
-	dec  b
-	jr   nz, .addTens
-
-	cp   MAX_LEVEL + 1              ; belt and braces
-	jr   c, .storeLevel
-	ld   a, MAX_LEVEL
-
-.storeLevel:
-	ldh  [hATypeLevel], a
-	ret
-
-.letterBank:
-	cp   GYM_LEVEL_BANKS - 1
-	jr   nz, .afterClampCursor
-
-	ldh  a, [hATypeLevel]
-	cp   GYM_TOP_BANK_COUNT
-	jr   c, .afterClampCursor
-
-	ld   a, GYM_TOP_BANK_COUNT - 1  ; walked past M: pull back and move the
-	ldh  [hATypeLevel], a           ; sprite, which the original will not do
-	ld   de, wSpriteSpecs + SPR_SPEC_BaseYOffset
-	ld   hl, ATypeLevelsCoords
-	call SetNumberSpecStructsCoordsAndSpecIdxFromHLtable
-	call Copy2SpriteSpecsToShadowOam
-
-.afterClampCursor:
-; the digit sprite would sit on top of a letter, so keep it hidden
+; Hide the grid cursor - it draws the character for hATypeLevel, which is not
+; what the picker is showing - and blink the picker cell instead, at the
+; original's own 16-frame cadence.
+; The original flashes this sprite by XOR-ing its hidden bit and then copying
+; the specs into OAM. Setting the bit here is not enough on its own - the copy
+; has already happened - so push the hidden state through as well, or the grid
+; cursor blinks on screen next to the picker.
 	ld   a, SPRITE_SPEC_HIDDEN
 	ld   [wSpriteSpecs + SPR_SPEC_Hidden], a
+	call Copy2SpriteSpecsToShadowOam
 
-; blink the selected letter at the original cadence: 16 frames on, 16 off
-	ld   hl, wGymBlinkTimer
+; Hearts are min(level + 10, 20). Above level 20 that ceiling clamps *downward*
+; and makes the game slower, so hearts are simply turned off up there rather
+; than changing the original formula, which normal heart games rely on.
+; See docs/existing-hacks.md 3.2b.
+	ld   a, [wGymPickerLevel]
+	cp   21
+	jr   c, .blink
+	ldh  a, [hIsHardMode]
+	and  a
+	jr   z, .blink
+	xor  a
+	ldh  [hIsHardMode], a
+	call GymDrawHearts
+
+.blink:
+	ld   hl, wGymPickerBlink
 	inc  [hl]
 	ld   a, [hl]
 	and  $10
-	ld   b, a                       ; b = phase
+	jr   z, GymDrawPickerBlank
+	jr   GymDrawPicker
 
+; The original has handed over, so hATypeLevel stops being a grid index and
+; becomes the level the game will start on.
+.leavingScreen:
+	ld   a, [wGymPickerActive]
+	and  a
+	ret  z
+	ld   a, [wGymPickerLevel]
+	ldh  [hATypeLevel], a
+	ret
+
+
+GymShowGridCursor::
+	xor  a
+	ld   [wSpriteSpecs + SPR_SPEC_Hidden], a
+	ld   de, wSpriteSpecs + SPR_SPEC_BaseYOffset
+	ld   hl, ATypeLevelsCoords
 	ldh  a, [hATypeLevel]
-	ld   c, a                       ; c = selected cell
-	ld   a, [wGymBlinkCell]
-	cp   c
-	jr   nz, .repaint               ; cursor moved: repaint both cells
-	ld   a, [wGymBlinkPhase]
+	call SetNumberSpecStructsCoordsAndSpecIdxFromHLtable
+	jp   Copy2SpriteSpecsToShadowOam
+
+
+GymDrawPickerBlank::
+	ld   a, PICKER_BLANK
+	jr   GymDrawPickerTile
+
+GymDrawPicker::
+	ld   a, [wGymPickerLevel]
+
+; Paint one tile into the picker cell, skipping the write when it is already
+; there. Waits for VBlank rather than queueing - it is a single byte.
+GymDrawPickerTile::
+	ld   b, a
+	ld   a, [wGymPickerDrawn]
 	cp   b
-	ret  z                          ; nothing changed
-
-.repaint:
+	ret  z
 	ld   a, b
-	ld   [wGymBlinkPhase], a
-	ld   a, c
-	ld   [wGymBlinkCell], a
-	jp   GymRedrawLevelScreen
+	ld   [wGymPickerDrawn], a
 
-
-; Repaint the ten level cells, and the hearts indicator, to match the current
-; bank. Ten tilemap writes, so we simply wait for VBlank rather than building a
-; queue - the original does the same thing in HandleLockdownTransferToTilemap.
-GymRedrawLevelScreen::
 .waitVBlank:
 	ldh  a, [rLY]
 	cp   SCRN_Y
 	jr   c, .waitVBlank
 
-	ld   a, [wGymLevelBank]
-	ld   hl, GymBankTiles
-	and  a
-	jr   z, .haveTiles
-	ld   b, a
-	ld   de, 10
+	ld   a, [wGymPickerDrawn]
+	ld   [PICKER_CELL], a
+	ret
 
-.offsetLoop:
-	add  hl, de
-	dec  b
-	jr   nz, .offsetLoop
 
-.haveTiles:
-	ld   de, _SCRN0 + 6 * 32 + 5    ; top row of level cells
-	ld   b, 0
-	call .writeRow
-	ld   de, _SCRN0 + 8 * 32 + 5    ; bottom row
-	ld   b, 5
-	call .writeRow
-
-; hearts indicator, in the blank strip to the right of "LEVEL"
+; Show whether hearts are armed, in the blank strip beside "LEVEL".
+GymDrawHearts::
 	ldh  a, [hIsHardMode]
 	and  a
 	ld   a, TILE_HEART
-	jr   nz, .storeHeart
-	ld   a, TILE_LEVEL_ROW_BLANK
+	jr   nz, .paint
+	ld   a, TILE_FRAME
 
-.storeHeart:
-	ld   [_SCRN0 + 4 * 32 + 14], a
+.paint:
+	ld   b, a
+
+.waitVBlank:
+	ldh  a, [rLY]
+	cp   SCRN_Y
+	jr   c, .waitVBlank
+
+	ld   a, b
+	ld   [HEART_CELL], a
 	ret
-
-; Blank the selected cell while the blink phase is off, so the letter flashes
-; in place of the digit sprite we had to hide.
-.maybeBlank:
-	push af
-	ld   a, [wGymBlinkPhase]
-	and  a
-	jr   nz, .keepTile              ; phase on: draw normally
-	ld   a, [wGymBlinkCell]
-	cp   b
-	jr   nz, .keepTile
-	pop  af
-	ld   a, TILE_BLANK_CELL
-	ret
-
-.keepTile:
-	pop  af
-	ret
-
-.writeRow:
-	ld   c, 5
-
-.cellLoop:
-	ld   a, [hl+]
-	call .maybeBlank
-	ld   [de], a
-	inc  de
-	inc  de                         ; cells are two tiles apart
-	inc  b                          ; b tracks which cell we are on
-	dec  c
-	jr   nz, .cellLoop
-	ret
-
-
-; Tiles drawn in the ten level cells, one row of ten per bank.
-GymBankTiles::
-	;   0    1    2    3    4    5    6    7    8    9   - original digit art
-	db $90, $91, $92, $93, $94, $95, $96, $97, $98, $99
-	;   A    B    C    D    E    F    G    H    I    J   - font letters
-	db $0a, $0b, $0c, $0d, $0e, $0f, $10, $11, $12, $13
-	;   K    L    M   then blanks - only three valid entries
-	db $14, $15, $16, $2f, $2f, $2f, $2f, $2f, $2f, $2f
-
-; ---------------------------------------------------------------------------
-; Bank 3 - reserved. Declared so the linker reports it and the ROM sizes to
-; 64KB. Grow to more banks when we actually need them: a smaller ROM is a
-; cheaper cartridge, and the community intends to have carts produced.
-; ---------------------------------------------------------------------------
-
-SECTION "Gym Reserved", ROMX[$4000], BANK[3]
-	db "RESERVED", 0

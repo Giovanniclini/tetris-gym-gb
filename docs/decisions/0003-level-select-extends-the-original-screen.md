@@ -1,58 +1,71 @@
-# 3. Level select extends the original screen rather than adding a menu
+# 3. A level picker beside the grid, not a rebuilt grid
 
-**Status:** accepted, 2026-08-20 (Milestone 1)
+**Status:** accepted, 2026-08-20 (Milestone 1). Supersedes a rejected first attempt, kept below.
 
 ## Context
 
-Levels 0-22 must be selectable. The original A-type screen offers 0-9 as a
-5×2 grid of custom digit tiles (`$90-$99`) with a sprite cursor positioned from
-`ATypeLevelsCoords`. KLM extends the same screen, changing only nine tiles.
+Levels 0-22 must be selectable. The original A-type screen offers 0-9 as a 5x2
+grid of custom digit tiles (`$90-$99`) with a sprite cursor positioned from
+`ATypeLevelsCoords`.
 
 ## Decision
 
-Extend the existing screen with a **bank** concept — `0-9`, `A-J`, `K-M` — and
-repaint the ten cells. No new screen. A separate Gym menu waits until there is
-something to configure that does not belong on an existing screen (Milestone 2).
+**Leave the original grid completely alone** - same tiles, same cursor, same
+movement - and add **one picker cell to its right**, changed with Left and
+Right, showing `0-9` then `A-M`.
 
-## The input choices, and why they are free
+* **Right on cell 9** gives the picker focus. The original ignores that press
+  (`cp $09 / jr z`), so nothing has to be suppressed to reach it.
+* **Left at level 0** hands focus back to grid cell 9.
+* **Select** toggles hearts, with a heart drawn beside `LEVEL`. The original
+  never tests Select on this screen.
+* The picker cell's tile is simply the level number: the font puts `0-9` at
+  `$00-$09` and `A-M` at `$0A-$16`, so `tile == level` throughout.
 
-* **Down on the bottom row / Up on the top row** cycle the bank. The original
-  *explicitly ignores* both (`cp $05 / jr nc, .sendSpritesToOam`), so normal
-  cursor movement needed no changes.
-* **Select** toggles hearts. The original never tests it on this screen.
+Modelled on NES TetrisGYM, which does the same thing - the grid stays, a picker
+appears beside it.
 
-Falling off the bottom of a bank lands on the **top row of the next**, so Down
-keeps reading as "keep going down" instead of dumping you back on the row you
-just left.
+## The rejected first attempt, and why
 
-## Consequences and gotchas found the hard way
+The first design gave the grid three *banks* - `0-9`, `A-J`, `K-M` - cycled with
+Down on the bottom row, repainting all ten cells. It passed thirteen tests and
+was unusable in practice.
 
-* **We run before *and* after the original handler.** The pre-pass consumes
-  input and changes bank; the post-pass fixes up what the original did. A
-  post-pass is unavoidable because the cursor *sprite* is positioned by the
-  original on its own terms, and clamping `hATypeLevel` alone leaves the sprite
-  stale — the cursor visibly sits on an empty cell.
-* **Consume the inputs you act on.** The original runs after us and sees the
-  same `hButtonsPressed`. Clamping the cursor to K left it on the top row, so
-  the original then moved it *down* into an empty cell. Bits we act on are
-  cleared with `res`.
-* **The bank must be folded into `hATypeLevel` only when leaving the screen.**
-  While the screen is up, `hATypeLevel` holds the cursor index 0-9 so the
-  original's cursor and coordinate-table code works untouched. Doing the fold
-  in the pre-pass instead meant the post-pass clamp saw a real level rather than
-  an index and pulled level 21 back to 2.
+It failed because it fought the original screen in four places at once:
+
+* The grid cursor is a **sprite that draws the character for the level** (spec
+  index `$20 + level` picks a one-tile sprite), and the ROM has those specs
+  **only for digits 0-9**. On a letter bank it drew a digit over a letter.
+* Clamping the cursor without moving the sprite left it visibly parked on an
+  empty cell.
+* The original handler runs after ours and sees the same `hButtonsPressed`, so
+  consumed presses had to be cleared or it moved the cursor again underneath us.
+* Repainting ten cells every bank change fought the original's own repaint.
+
+**The lesson is not "that was hard".** The tests passed because they asserted
+what the implementation did, not what a player experiences. A design that needs
+four separate fixes to coexist with the code around it is the wrong design; the
+picker needs none of them.
+
+## Consequences and gotchas that still apply
+
+* **We run before *and* after the original handler.** The pre-pass reads input;
+  the post-pass corrects the sprite. A post-pass is unavoidable because the
+  original positions and copies the cursor sprite on its own terms.
+* **Hiding a sprite means pushing it to OAM.** The original flashes the cursor
+  by XOR-ing its hidden bit *and then copying the specs into OAM*. Setting the
+  bit in the post-pass is too late on its own - the copy already happened - so
+  the post-pass calls `Copy2SpriteSpecsToShadowOam` as well. Without that the
+  cursor blinks on screen beside the picker.
+* **Consume the inputs you act on**, with `res` on `hButtonsPressed`, or the
+  original acts on them too.
+* **Fold the picker level into `hATypeLevel` only when leaving the screen.**
+  While the screen is up `hATypeLevel` stays a grid index so the original's
+  cursor code works untouched.
 * **Repaint one frame late.** The original's init copies the whole layout over
-  the screen *after* our init runs, so anything we draw during init is erased.
-  A pending flag defers the repaint to the next frame.
-* **Letters blink; digits do not.** The cursor sprite draws the *character* for
-  the level — spec index `$20 + level` selects a one-tile sprite — and the ROM
-  contains those specs only for digits `0-9`. On a letter bank it therefore drew
-  a digit on top of a letter. Adding letter sprites would mean extending
-  `SpriteData`, which shifts bank 0 (ADR 2), so instead the sprite is hidden and
-  the selected letter blinks in place, at the original's own 16-frame cadence
-  (`hTimer1`). Digits keep their original grey/black flash.
-* **Hearts are not offered on K-M.** Hard mode is `min(level + 10, 20)`, a
-  ceiling written when 20 was the highest level; at L and M it clamps *downward*
-  and makes the game slower. Raising the ceiling would change normal heart games,
-  which players rely on, so the option is simply withheld where it cannot help.
-  See `docs/existing-hacks.md` §3.2b.
+  the screen *after* our init runs, so a pending flag defers the paint.
+* **Hearts are cleared above level 20.** Hard mode is `min(level + 10, 20)`, a
+  ceiling written when 20 was the highest level; above it the clamp works
+  *downward* and makes the game slower. Changing the formula would alter normal
+  heart games, so the option is withheld instead. See
+  `docs/existing-hacks.md` 3.2b.
