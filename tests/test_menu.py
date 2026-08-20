@@ -52,12 +52,12 @@ def open_picker(t):
 
 
 def picker_to(t, level):
-    while t[wGymPickerLevel] < level:
-        t.press("right")
-    while t[wGymPickerLevel] > level:
-        t.press("left")
-    assert t[wGymPickerLevel] == level
-    return t
+    for _ in range(MAX_LEVEL + 1):
+        here = t[wGymPickerLevel]
+        if here == level:
+            return t
+        t.press("up" if here < level else "down")
+    raise AssertionError(f"stuck at {t[wGymPickerLevel]} heading for {level}")
 
 
 def test_the_original_grid_is_never_modified():
@@ -85,20 +85,27 @@ def test_grid_movement_is_unchanged():
 
 
 def test_picker_opens_and_closes_from_the_grid():
+    """Left leaves the field from any level, not just from 0."""
     with Tetris(ROM) as t:
         open_picker(t)
-        picker_to(t, 0)
-        t.press("left")                       # left at 0 hands focus back
+        picker_to(t, 12)
+        t.press("left")
         assert t[wGymFocus] == FOCUS_GRID, "focus should have returned to the grid"
         assert t[hATypeLevel] == 9, "focus should return to grid cell 9"
 
 
 def test_picker_clamps_at_both_ends():
+    """Up and Down change the level and stop at M and 0 - 0 is a level, not the
+    way out of the field."""
     with Tetris(ROM) as t:
         open_picker(t)
         for _ in range(30):
-            t.press("right")
+            t.press("up")
         assert t[wGymPickerLevel] == MAX_LEVEL, "should stop at M"
+        for _ in range(30):
+            t.press("down")
+        assert t[wGymPickerLevel] == 0, "should stop at 0"
+        assert t[wGymFocus] == FOCUS_LEVEL, "Down at 0 should not leave the field"
 
 
 def test_picker_cell_shows_the_level_character():
@@ -154,23 +161,26 @@ def test_grid_cursor_is_hidden_while_the_picker_has_focus():
             assert y == 0 or y >= 160, f"grid cursor visible on screen at Y={y}"
 
 
-def test_up_on_the_level_field_does_not_move_the_grid_cursor():
-    """Up has nowhere to go from the level field, but it must still be
-    swallowed - the original would move the grid cursor underneath, and Left
-    from here returns focus to wherever it ended up."""
+def test_the_level_field_swallows_up_and_down():
+    """They change the level. The original reads the same presses to move the
+    grid cursor, and would do so underneath us - then Left would hand focus
+    back to a cell the player never chose."""
     with Tetris(ROM) as t:
         open_picker(t)
         before = t[hATypeLevel]
-        t.press("up")
-        assert t[hATypeLevel] == before, "grid cursor moved under the level field"
-        assert t[wGymFocus] == FOCUS_LEVEL, "focus changed"
+        for direction in ("up", "down", "up"):
+            t.press(direction)
+            assert t[hATypeLevel] == before, "grid cursor moved under the level field"
+            assert t[wGymFocus] == FOCUS_LEVEL, "focus changed"
 
 
-def test_down_from_the_level_field_enters_the_seed():
+def test_right_and_left_walk_between_the_fields():
     with Tetris(ROM) as t:
         open_picker(t)
-        t.press("down")
-        assert t[wGymFocus] == FOCUS_SEED, f"focus is {t[wGymFocus]}"
+        t.press("right")
+        assert t[wGymFocus] == FOCUS_SEED, f"Right should enter the seed, focus is {t[wGymFocus]}"
+        t.press("left")
+        assert t[wGymFocus] == FOCUS_LEVEL, f"Left should come back, focus is {t[wGymFocus]}"
 
 
 def test_starting_from_the_picker_uses_its_level():
@@ -230,7 +240,7 @@ def test_hearts_are_cleared_above_level_20():
         assert t[hIsHardMode] != 0
         while t[hATypeLevel] < 9:            # already on the screen; do not renavigate
             t.press("right")
-        t.press("right")
+        t.press("right")                     # into the level field
         assert t[wGymFocus]
         picker_to(t, 21)
         t.tick(4)
@@ -319,13 +329,13 @@ def test_high_scores_follow_the_picked_level():
         assert dots(t) == empty, "A has no score yet; expected placeholders"
 
         while t[wGymPickerLevel] > 5:
-            t.press("left")
+            t.press("down")
         assert dots(t) == with_score, (
             "the panel should show level 5's scores when the level field is on 5"
         )
 
         while t[wGymPickerLevel] < 22:
-            t.press("right")
+            t.press("up")
         assert dots(t) == with_score, "M has its own slot and should show it"
 
 

@@ -1,6 +1,7 @@
 # 3. A level picker beside the grid, not a rebuilt grid
 
-**Status:** accepted, 2026-08-20 (Milestone 1). Supersedes a rejected first attempt, kept below.
+**Status:** accepted, 2026-08-20 (Milestone 1); navigation revised 2026-08-21.
+Supersedes a rejected first attempt, kept below.
 
 ## Context
 
@@ -22,13 +23,12 @@ movement - and add fields in the blank strip to its right. Columns 15-18, rows
    row 10      A  C  E  1      seed, four hex digits
 ```
 
-Focus moves in a chain: **grid -> level -> the four seed digits**. Right on grid
-cell 9 enters the level field (a press the original ignores); Down from the
-level field drops into the seed; Left walks back the same way.
+Focus moves in a chain: **grid -> level -> the four seed digits**. **Left and
+Right walk the chain; Up and Down change the value under the cursor.**
 
 * **Right on cell 9** gives the picker focus. The original ignores that press
   (`cp $09 / jr z`), so nothing has to be suppressed to reach it.
-* **Left at level 0** hands focus back to grid cell 9.
+* **Left** leaves the level field for grid cell 9, from any level.
 * **Select** toggles hearts, with a heart drawn beside `LEVEL`. The original
   never tests Select on this screen.
 * The picker cell's tile is simply the level number: the font puts `0-9` at
@@ -76,10 +76,12 @@ picker needs none of them.
   cursor code works untouched.
 * **Repaint one frame late.** The original's init copies the whole layout over
   the screen *after* our init runs, so a pending flag defers the paint.
-* **Up/Down mean different things per field**, deliberately: they navigate on
-  the level field and change the value on a seed digit. Making Left/Right always
-  navigate would be more consistent but would change the level field's behaviour,
-  which works. Each field behaves the way its own type suggests.
+* **Left/Right navigate, Up/Down edit - in every field.** *Revised 2026-08-21,
+  reversing the original entry here.* The first version had Left/Right change
+  the level and Down enter the seed, so the same two buttons meant "change the
+  value" on one field and "move to the next field" on the next. Worse, Left had
+  to do both: step down a level, and at 0 leave the field. Now `0` is just a
+  level, and the way out is the same press everywhere.
 * **A seed of `$0000` means "no seed"** - SPS off, pieces from `rDIV`, which is
   genuinely random. That spends the degenerate all-zero LFSR state as the "off"
   value rather than leaving it as a trap, and means there is nothing to

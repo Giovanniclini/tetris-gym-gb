@@ -208,9 +208,10 @@ GymDispatch::
 ;   row  9      S  E  E  D
 ;   row 10      A  C  E  1      seed, four hex digits
 ;
-; Focus moves in a chain: grid -> level -> the four seed digits. Right on grid
-; cell 9 enters the level field (a press the original ignores); Down from the
-; level field drops into the seed. The focused field blinks.
+; Focus moves in a chain: grid -> level -> the four seed digits. Left and Right
+; walk the chain, Up and Down change the value under the cursor. Right on grid
+; cell 9 enters the level field - a press the original ignores, which is what
+; makes the grid's own movement survive untouched. The focused field blinks.
 ;
 ; A seed of $0000 means "no seed", so SPS is off and pieces come from rDIV as
 ; they always did - which is genuinely random, so there is nothing to randomise.
@@ -332,41 +333,39 @@ GymLevelSelectMain::
 	jr   .consume
 
 ; --- the level field has focus ---
+; Every direction that lands here is swallowed, whether or not it changed
+; anything: the original would otherwise move the grid cursor underneath us.
 .levelFocus:
-; Up has nowhere to go from here, but must still be swallowed: the original
-; would otherwise move the grid cursor underneath us, and Left from this field
-; returns focus to wherever it ended up.
-	bit  PADB_UP, c
-	jr   nz, .consume
+	bit  PADB_LEFT, c
+	jr   z, .levelNotLeft
+	xor  a                          ; FOCUS_GRID
+	ld   [wGymFocus], a
+	call GymShowGridCursor
+	jr   .consume
 
-	bit  PADB_DOWN, c
-	jr   z, .levelNotDown
-	ld   a, FOCUS_SEED              ; drop into the seed, leftmost digit
+.levelNotLeft:
+	bit  PADB_RIGHT, c
+	jr   z, .levelNotRight
+	ld   a, FOCUS_SEED              ; on into the seed, leftmost digit
 	ld   [wGymFocus], a
 	jr   .consume
 
-.levelNotDown:
-	bit  PADB_RIGHT, c
-	jr   z, .levelNotRight
+.levelNotRight:
+	bit  PADB_UP, c
+	jr   z, .levelNotUp
 	ld   a, [wGymPickerLevel]
 	cp   MAX_LEVEL
-	jr   nc, .consume
+	jr   nc, .consume               ; already at M
 	inc  a
 	ld   [wGymPickerLevel], a
 	jr   .consume
 
-.levelNotRight:
-	bit  PADB_LEFT, c
+.levelNotUp:
+	bit  PADB_DOWN, c
 	ret  z
 	ld   a, [wGymPickerLevel]
 	and  a
-	jr   nz, .levelDec
-
-	ld   [wGymFocus], a             ; a is 0 = FOCUS_GRID
-	call GymShowGridCursor
-	jr   .consume
-
-.levelDec:
+	jr   z, .consume                ; already at 0
 	dec  a
 	ld   [wGymPickerLevel], a
 	jr   .consume

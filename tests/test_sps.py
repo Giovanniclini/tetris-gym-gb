@@ -203,7 +203,7 @@ def test_the_seed_is_reloaded_at_the_start_of_every_game():
 
 
 def test_seed_can_be_entered_from_the_menu():
-    """Grid -> Right on 9 -> level field -> Down -> four hex digits, each
+    """Grid -> Right on 9 -> level field -> Right -> four hex digits, each
     changed with Up and Down."""
     with Tetris(ROM) as t:
         t.to_level_select()
@@ -211,7 +211,7 @@ def test_seed_can_be_entered_from_the_menu():
         while t[hATypeLevel] < 9:
             t.press("right")
         t.press("right")                       # level field
-        t.press("down")                        # first seed digit
+        t.press("right")                       # first seed digit
         for nibble in (0xA, 0xC, 0xE, 0x1):
             for _ in range(nibble):
                 t.press("up")
