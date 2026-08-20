@@ -76,7 +76,9 @@ toolchain pinning; upstream issue #6.
 - [ ] `FarCall` into a stub in bank 2 and back works, verified in an emulator
       *(trampoline assembled and byte-checked; execution needs the M1 harness)*
 - [ ] SRAM survives a power cycle on real hardware *(needs a flash cart)*
-- [ ] Gameplay is indistinguishable *(needs a human at an emulator)*
+- [x] Gameplay is indistinguishable — verified in mGBA 0.10.5, 2026-08-20. The only observable
+      difference was greyscale vs colour, which is emulator ROM-database recognition, not the ROM
+      (`docs/research.md` §4.1a)
 - [ ] Boots on DMG, GBP, GBC, SameBoy, BGB, Emulicious
 
 **Status 2026-08-20: structurally complete, awaiting behavioural verification.**
