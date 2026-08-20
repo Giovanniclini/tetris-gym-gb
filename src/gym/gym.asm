@@ -72,7 +72,10 @@ wGymRngHi:: db
 wGymSeedLo:: db
 wGymSeedHi:: db
 
-	ds 1014
+; Scratch for GymUpdateHighScores, which borrows hATypeLevel.
+wGymSavedGridLevel:: db
+
+	ds 1013
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -387,6 +390,7 @@ GymLevelSelectMain::
 	ldh  [hButtonsPressed], a
 	ld   a, SND_MOVING_SELECTION
 	ld   [wSquareSoundToPlay], a
+	call GymUpdateHighScores
 	jp   GymPaintFields
 
 
@@ -584,6 +588,44 @@ GymBlankIfFocused::
 
 .keep:
 	pop  af
+	ret
+
+
+; Keep the TOP SCORE panel showing the level you are actually about to play.
+;
+; The original drives it from hATypeLevel, which the Gym keeps as the grid index
+; while the level field or the seed has focus - so it kept showing the grid
+; cursor's scores while you had M selected.
+;
+; The high score table has ten slots, one per grid level; A-M have no storage at
+; all. For those the panel shows the dotted placeholder the original already
+; uses for empty entries, which is honest: there are no scores for that level.
+GymUpdateHighScores::
+; The grid index is borrowed and must be put back. Saved in RAM rather than on
+; the stack: the routines called below are the original's, and relying on them
+; to leave the stack exactly as they found it is a bet worth not taking.
+	ldh  a, [hATypeLevel]
+	ld   [wGymSavedGridLevel], a
+
+	ld   a, [wGymFocus]
+	and  a
+	jr   z, .showIt                 ; grid focus: hATypeLevel is already right
+
+	ld   a, [wGymPickerLevel]
+	cp   10
+	jr   nc, .noScores
+	ldh  [hATypeLevel], a
+
+.showIt:
+	call DisplayATypeHighScoresForLevel
+	jr   .restore
+
+.noScores:
+	call DisplayDottedLinesForHighScore
+
+.restore:
+	ld   a, [wGymSavedGridLevel]
+	ldh  [hATypeLevel], a
 	ret
 
 
