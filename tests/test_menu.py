@@ -18,7 +18,8 @@ from tools.emu import Tetris, hATypeLevel, hIsHardMode, GS_IN_GAME_MAIN  # noqa:
 
 ROM = "build/tetrisgym.gb"
 
-wGymPickerActive = 0xD800
+wGymFocus = 0xD800
+FOCUS_GRID, FOCUS_LEVEL, FOCUS_SEED = 0, 1, 2
 wGymPickerLevel = 0xD801
 
 GRID_CELLS = ([0x9800 + 6 * 32 + 5 + 2 * i for i in range(5)]
@@ -42,7 +43,7 @@ def open_picker(t):
     while t[hATypeLevel] < 9:
         t.press("right")
     t.press("right")
-    assert t[wGymPickerActive], "Right on cell 9 should open the picker"
+    assert t[wGymFocus] == FOCUS_LEVEL, "Right on cell 9 should focus the level field"
     return t
 
 
@@ -84,7 +85,7 @@ def test_picker_opens_and_closes_from_the_grid():
         open_picker(t)
         picker_to(t, 0)
         t.press("left")                       # left at 0 hands focus back
-        assert not t[wGymPickerActive], "picker should have closed"
+        assert t[wGymFocus] == FOCUS_GRID, "focus should have returned to the grid"
         assert t[hATypeLevel] == 9, "focus should return to grid cell 9"
 
 
@@ -149,14 +150,23 @@ def test_grid_cursor_is_hidden_while_the_picker_has_focus():
             assert y == 0 or y >= 160, f"grid cursor visible on screen at Y={y}"
 
 
-def test_vertical_input_is_ignored_while_the_picker_has_focus():
+def test_up_on_the_level_field_does_not_move_the_grid_cursor():
+    """Up has nowhere to go from the level field, but it must still be
+    swallowed - the original would move the grid cursor underneath, and Left
+    from here returns focus to wherever it ended up."""
     with Tetris(ROM) as t:
         open_picker(t)
         before = t[hATypeLevel]
         t.press("up")
+        assert t[hATypeLevel] == before, "grid cursor moved under the level field"
+        assert t[wGymFocus] == FOCUS_LEVEL, "focus changed"
+
+
+def test_down_from_the_level_field_enters_the_seed():
+    with Tetris(ROM) as t:
+        open_picker(t)
         t.press("down")
-        assert t[hATypeLevel] == before, "grid cursor moved under the picker"
-        assert t[wGymPickerActive], "picker lost focus"
+        assert t[wGymFocus] == FOCUS_SEED, f"focus is {t[wGymFocus]}"
 
 
 def test_starting_from_the_picker_uses_its_level():
@@ -217,7 +227,7 @@ def test_hearts_are_cleared_above_level_20():
         while t[hATypeLevel] < 9:            # already on the screen; do not renavigate
             t.press("right")
         t.press("right")
-        assert t[wGymPickerActive]
+        assert t[wGymFocus]
         picker_to(t, 21)
         t.tick(4)
         assert t[hIsHardMode] == 0, "hearts should be cleared above level 20"

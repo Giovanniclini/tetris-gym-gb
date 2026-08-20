@@ -49,6 +49,12 @@
 ;                                            score name entry, so the reset
 ;                                            combination restarts the drill
 ;                                            rather than rebooting.
+;   HOOK_STATE_TABLE0A $030F-$0310        2  Jump-table entry for $0A, in-game
+;                                            init, so the configured seed is
+;                                            loaded into the LFSR at the start
+;                                            of every game - including an
+;                                            instant restart, which must repeat
+;                                            the sequence rather than continue.
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.

@@ -3,8 +3,7 @@
 **A TetrisGYM-style training and practice ROM for the original Nintendo Game Boy Tetris (1989).**
 
 > **Status:** see [`docs/roadmap.md`](docs/roadmap.md).
-> Working today: level select up to M, hearts, and instant restart. SPS works
-> but has no seed entry yet.
+> Working today: level select up to M, hearts, instant restart and SPS.
 
 ---
 
@@ -57,14 +56,11 @@ does not need competition.
 | **Level select to M** | Levels `0-9` and `A-M` from a picker beside the original grid — `M` is one row per frame, the engine's ceiling |
 | **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
 | **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
+| **SPS** | A seed beside the level picker. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
 
 **Next**
 
-SPS — same piece sequence — seeded and shareable, so two players get identical
-pieces. The generator is done and verified interoperable with the community's
-own seeded ROM; it needs seed entry to be reachable.
-
-After that: transition trainer, Hz counter, floor and preset boards, low stack,
+Transition trainer, Hz counter, floor and preset boards, low stack,
 VS garbage. Ranked from community evidence in
 [`docs/community-research.md`](docs/community-research.md) §6.2.
 

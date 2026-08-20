@@ -9,7 +9,7 @@ current.
 | 0 — Reproduce the original ROM | **done** |
 | 0.5 — Cartridge expansion (MBC1, 64 KB, SRAM) | **done** — hardware checks outstanding |
 | 1 — Level picker, hearts, instant restart | **done** |
-| 2 — Core training features | **in progress** — SPS engine done, seed UI next |
+| 2 — Core training features | **in progress** — SPS done; transition trainer next |
 | 3 — Board control and information | not started |
 | 4 — Replay, tooling and polish | not started |
 | 5 — Hardware validation and 1.0 | not started |
@@ -180,9 +180,10 @@ and a headless emulator harness. Verified in an emulator and by hand.
 the bar the GBTetris Discord named for a physical cart run: *"SPS + extended level select +
 whatever else"* (`docs/community-research.md` §3.4).
 
-**Status 2026-08-20: SPS engine done** — the community's LFSR, interoperable,
-verified against their ROM (`docs/existing-hacks.md` §4). No seed UI yet, so it
-is not reachable by a player. That is the next change.
+**Status 2026-08-20: SPS complete.** The community's LFSR, interoperable and
+verified against their ROM (`docs/existing-hacks.md` §4), with seed entry beside
+the level picker. A seed of `$0000` means "no seed", so SPS is off and pieces
+come from `rDIV` as they always did.
 
 Work follows the revised list in `docs/community-research.md` §6.2:
 

@@ -18,6 +18,8 @@ from tools.emu import Tetris, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
 
 ROM = "build/tetrisgym.gb"
 wGymRngLo, wGymRngHi = 0xD806, 0xD807
+wGymSeedLo, wGymSeedHi = 0xD808, 0xD809
+GS_IN_GAME_INIT = 0x0A
 hGymSpsEnabled = 0xFFFE
 hHiddenLoadedPiece = 0xFFAE
 rDIV = 0xFF04
@@ -144,16 +146,82 @@ def test_sps_off_leaves_the_original_generator_alone():
         )
 
 
-def test_zero_seed_is_refused():
-    """$0000 is a degenerate LFSR state: period 1, every draw returns zero. The
-    community's ROM offers it as a default and does not guard it."""
+def test_a_seed_of_zero_means_no_seed():
+    """$0000 is spent as the "off" value rather than left as a trap.
+
+    It is also a degenerate LFSR state - period 1, every draw returns zero - so
+    the community's ROM, which offers it as a default and does not guard it, can
+    reach it. Ours cannot: zero disarms SPS and pieces come from rDIV, which is
+    genuinely random. That is why there is no "randomise" button.
+    """
     h, l = 0, 0
     for _ in range(5):
         h, l = lfsr_step(h, l)
         assert (h, l) == (0, 0), "the model should confirm $0000 is a fixed point"
-    # GymSetSeed nudges it to $0001; assert the guard exists in the ROM
-    sym = (ROOT / "build" / "tetrisgym.sym").read_text()
-    assert "GymSetSeed" in sym, "no seed setter with a zero guard"
+
+    with Tetris(ROM) as t:
+        t.to_level_select()
+        t.pb.memory[wGymSeedLo] = 0
+        t.pb.memory[wGymSeedHi] = 0
+        t.pb.memory[hATypeLevel] = 9
+        t.press("start")
+        t.run_until_state(GS_IN_GAME_MAIN)
+        assert t[hGymSpsEnabled] == 0, "a zero seed should leave SPS off"
+
+
+def test_the_seed_is_reloaded_at_the_start_of_every_game():
+    """A restart must repeat the sequence, not continue it."""
+    def lfsr_at_init(t, limit=200):
+        seen = []
+        for _ in range(limit):
+            t.tick(1)
+            if t.state == GS_IN_GAME_INIT:
+                seen.append((t[wGymRngHi] << 8) | t[wGymRngLo])
+                if len(seen) >= 3:
+                    break
+        return seen
+
+    with Tetris(ROM) as t:
+        t.to_level_select()
+        t.pb.memory[wGymSeedLo] = 0xE1
+        t.pb.memory[wGymSeedHi] = 0xAC
+        t.pb.memory[hATypeLevel] = 9
+        t.press("start")
+        t.run_until_state(GS_IN_GAME_MAIN)
+        t.tick(600)
+        mid = (t[wGymRngHi] << 8) | t[wGymRngLo]
+        assert mid != 0xACE1, "the LFSR should have advanced during play"
+
+        for b in ("a", "b", "select", "start"):
+            t.pb.button_press(b)
+        seen = lfsr_at_init(t)
+        for b in ("a", "b", "select", "start"):
+            t.pb.button_release(b)
+        assert 0xACE1 in seen, (
+            f"seed not reloaded on restart; saw {[hex(v) for v in seen]}"
+        )
+
+
+def test_seed_can_be_entered_from_the_menu():
+    """Grid -> Right on 9 -> level field -> Down -> four hex digits, each
+    changed with Up and Down."""
+    with Tetris(ROM) as t:
+        t.to_level_select()
+        t.tick(10)
+        while t[hATypeLevel] < 9:
+            t.press("right")
+        t.press("right")                       # level field
+        t.press("down")                        # first seed digit
+        for nibble in (0xA, 0xC, 0xE, 0x1):
+            for _ in range(nibble):
+                t.press("up")
+            t.press("right")
+        seed = (t[wGymSeedHi] << 8) | t[wGymSeedLo]
+        assert seed == 0xACE1, f"typed $ACE1, got ${seed:04X}"
+
+        t.press("start")
+        t.run_until_state(GS_IN_GAME_MAIN)
+        assert t[hGymSpsEnabled] != 0, "a non-zero seed should arm SPS"
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

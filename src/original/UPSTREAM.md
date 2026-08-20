@@ -19,7 +19,7 @@ which remains copyrighted. See `docs/research.md` §7.
 
 ## Local deviations from upstream
 
-Ten, all minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
+Eleven, all minimal. `build.py --original` still reproduces the stock ROM byte-exactly.
 
 Only three categories of deviation are ever permitted, and every one must be
 listed in the table below with a justification (see `docs/architecture.md` §3.1):
@@ -45,6 +45,7 @@ listed in the table below with a justification (see `docs/architecture.md` §3.1
 | 8 | `code/bank_000.s` | `IF GYM` routes the `$04` jump-table entry (end-of-game screen) through `GymStateHook` | 3 (hook) | That handler treats Start as "back to the level select", and Start is part of the reset combination - so by the time either soft-reset check runs the state has moved on and we would reboot. Catching it here is what makes "top out, go again" work. | 2. Zero when `GYM=0`. |
 | 9 | `code/inGameFlow.s`, `code/bank_000.s` | `IF GYM` replaces `ldh a, [rDIV] / ld b, a` with `call GymRandom` at the piece generator and at B-type's garbage draw | 3 (hook) | SPS. Three bytes for three, so nothing shifts. `GymRandom` returns the value in B exactly as those instructions did, and returns `rDIV` unchanged when SPS is off, so everything downstream — the counting loop, the OR-rejection retry and its bias — is untouched. | 3 + 3. Zero when `GYM=0`. |
 | 10 | `code/bank_000.s` | `IF GYM` routes the `$15` jump-table entry (high score name entry) through `GymStateHook` | 3 (hook) | So the reset combination restarts the drill from the name entry screen instead of rebooting. Abandoning the score is the point — when you are drilling you want another go, not a leaderboard entry. | 2. Zero when `GYM=0`. |
+| 11 | `code/bank_000.s` | `IF GYM` routes the `$0A` jump-table entry (in-game init) through `GymStateHook` | 3 (hook) | Loads the configured seed into the LFSR at the start of every game. Without it an instant restart would continue the sequence rather than repeat it, which defeats the point of a seed. | 2. Zero when `GYM=0`. |
 
 ## What was not vendored
 
