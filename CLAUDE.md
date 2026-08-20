@@ -92,19 +92,43 @@ Rev A`, v1.1) were made from measured evidence. Changing any of them requires:
 
 Never change one as a side effect of another task.
 
-### 6. Document significant decisions
+### 6. Keep the documentation current as you go
 
-New ADR in `docs/decisions/NNNN-short-title.md` for anything that constrains future work: emulator
-choice for the test harness, the 256-piece wrap behaviour, SRAM layout versioning, bank allocation
-changes. Short is fine — context, decision, consequences.
+Docs are part of the change, not a follow-up. Before finishing any piece of work, update whatever it
+made untrue:
 
-### 7. Do not make destructive changes
+| If you… | Update |
+| --- | --- |
+| finish or start a milestone | `docs/roadmap.md` — the **only** place status lives |
+| add or change a hook in the original banks | `src/hooks/hooks.inc`, `src/original/UPSTREAM.md`, `tests/test_expansion.py` |
+| add a player-visible feature | `README.md` feature list |
+| make a decision that constrains future work | a new ADR in `docs/decisions/` |
+| learn something measured about the ROM or the community | `docs/research.md`, `docs/community-research.md` or `docs/existing-hacks.md` |
+
+Stale documentation is worse than none: it gets trusted. If you find something out of date, fix it
+in the same change rather than noting it.
+
+ADRs should be short — context, decision, consequences, and any trap found the hard way.
+
+### 7. Write briefly
+
+Prefer fewer words. Concretely:
+
+* State the finding, not the search for it. Working notes belong in the commit message, not the docs.
+* One example beats three.
+* Tables beat paragraphs for anything enumerable.
+* Do not restate in prose what a code comment or a test already says — link to it.
+* Comments explain *why*; the code already says what.
+
+This applies to commit messages, PR descriptions and replies as much as to files.
+
+### 8. Do not make destructive changes
 
 No force-pushes, no history rewrites, no deleting or wholesale-rewriting `src/original/`, no
 removing tests to make a build pass. Do not commit or push unless the user asks. If on `main`,
 branch first.
 
-### 8. Do not install system-wide dependencies without asking
+### 9. Do not install system-wide dependencies without asking
 
 `python3 build.py` must keep working on a clean machine with **only Python 3 and network access** —
 no `make`, no `gcc`, no package manager, no global installs. RGBDS is downloaded to
@@ -113,13 +137,13 @@ no `make`, no `gcc`, no package manager, no global installs. RGBDS is downloaded
 If you believe a system-wide dependency is genuinely required, **ask first** and explain why the
 vendored approach cannot work.
 
-### 9. Never distribute ROM data
+### 10. Never distribute ROM data
 
 The Game Boy Tetris ROM is copyrighted. Releases contain a **BPS patch only**. Never commit a
 `.gb`/`.gbc` file, never attach one to a release or an issue, never paste ROM bytes into a
 conversation. Users supply their own ROM. `.gb` is in `.gitignore` — keep it there.
 
-### 10. Respect the platform's real constraints
+### 11. Respect the platform's real constraints
 
 Measured, not guessed (`docs/research.md` §4):
 
@@ -131,7 +155,7 @@ Measured, not guessed (`docs/research.md` §4):
 * Rendering that cannot fit the budget gets redesigned or dropped. It does not get to steal time
   from the original render path, because that would change original timing.
 
-### 11. Scope discipline
+### 12. Scope discipline
 
 Out of scope by decision, not omission: hold, hard drop, ghost piece, SRS, multi-piece preview,
 PAL/NTSC modes, Game Boy Color enhancement, Super Game Boy support.
@@ -174,7 +198,5 @@ If asked to add one of these, say it conflicts with a recorded decision, point a
 
 ## Current status
 
-**Kickoff research complete. No implementation code written yet.**
-
-The next task is **Milestone 0** in `docs/roadmap.md` — reproduce the original ROM byte-exactly from
-a vendored disassembly with a pinned, locally-vendored toolchain.
+**See `docs/roadmap.md`.** It is the single source of truth; do not restate status here or in the
+README, or it goes stale in three places at once.

@@ -747,9 +747,9 @@ directly in `docs/architecture.md` (§ build system) and `CLAUDE.md`.
 
 | # | Uncertainty | How to verify |
 | --- | --- | --- |
-| 1 | Exact initial DAS value. Verified as **`$17` = 23 frames** at `$2517`/`$254E`, autorepeat **`$09` = 9 frames** at `$2525`/`$255C`. TetrisWiki says "DAS: 24 frames"; Hard Drop says "23 initial, 9 autorepeat". | **Resolved in favour of Hard Drop** by reading the ROM. The "24" figure most likely counts the frame of the initial move. Confirm with a frame-stepped emulator trace before relying on it in a DAS trainer. |
+| ~~1~~ | **RESOLVED.** Exact initial DAS value. Verified as **`$17` = 23 frames** at `$2517`/`$254E`, autorepeat **`$09` = 9 frames** at `$2525`/`$255C`. TetrisWiki says "DAS: 24 frames"; Hard Drop says "23 initial, 9 autorepeat". | **Resolved in favour of Hard Drop** by reading the ROM. The "24" figure most likely counts the frame of the initial move. Confirm with a frame-stepped emulator trace before relying on it in a DAS trainer. |
 | 2 | `vinheim3` issue #6 (RGBDS 0.6.1 assertion failure) — not reproducible here. | Pin the toolchain, add a CI job that builds from a clean checkout on Linux and macOS. |
-| 3 | Whether the 256-entry `wRandomness` wrap is observable in practice (a 100-line run is ~250 pieces). | Instrument a build that logs piece indices; run a long session in an emulator. **This matters for the seed feature and should be checked early.** |
+| ~~3~~ | **MOOT.** SPS hooks the entropy source rather than filling `wRandomness`, so the 256-entry wrap never applies. See `docs/existing-hacks.md` §4. |
 | 4 | Whether v1.0's SHA-1 `3c1e0dd0…` is the canonical value (only MD5 is cross-referenced by multiple repos). | Cross-check against No-Intro DAT. Low priority — we target v1.1. |
 | 5 | Whether the speedrun.com community mandates a ROM version. | Ask in their Discord / forum. Affects whether a v1.0 build variant is worth supporting. |
 | 6 | Exact VBlank cycle headroom for a new HUD. | Measure with BGB's cycle counter or an Emulicious script on a build with a stub HUD. |

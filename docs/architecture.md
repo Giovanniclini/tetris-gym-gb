@@ -13,7 +13,7 @@
 | **D2** | **Target `Tetris (World) (Rev A)` — "v1.1".** MD5 `982ed5d2b12a0377eb14bcdc4123744e`, SHA-1 `74591cc9501af93873f9a5d3eb12da12c0723bbc`. | The version bundled with ~30 M Game Boys, the version the reference docs describe, the one with the sane level curve. v1.0 is a ~10 000-unit Japanese prototype with an easier level progression. |
 | **D3** | **Foundation: [`vinheim3/tetris-gb-disasm`](https://github.com/vinheim3/tetris-gb-disasm), vendored into `src/original/`.** | MIT-licensed, 100 % coverage, heavily commented, per-subsystem files — and **it built byte-exact here on the first attempt with zero patches**. `docs/research.md` §2.2. |
 | **D4** | **Pin RGBDS v0.6.1**, vendored by URL + SHA-256, not installed system-wide. | The repo targets it and it is verified working. RGBDS 1.0 removed pre-1.0 `EQU` syntax and breaks every GB Tetris disassembly. Toolchain drift is the most likely cause of upstream issue #6. |
-| **D5** | **Expand the cartridge to MBC1, 128 KB ROM (8 banks), 8 KB battery SRAM** (cart type `$03`). **PROVISIONAL — see D9.** | The original 32 KB ROM has **~400 usable free bytes**. This is arithmetic, not preference. The original already writes `1` to `$2000`, so MBC1 conversion is nearly free. Note this is *not* a copy of TetrisGYM: retail NES Tetris is already MMC1 and TetrisGYM's default build fits inside its original 32 KB. We have far less slack. `docs/research.md` §4.1–4.2. |
+| **D5** | **Expand the cartridge to MBC1, 64 KB ROM (4 banks), 8 KB battery SRAM** (cart type `$03`). **PROVISIONAL — see D9.** | The original 32 KB ROM has **~400 usable free bytes**. This is arithmetic, not preference. The original already writes `1` to `$2000`, so MBC1 conversion is nearly free. Note this is *not* a copy of TetrisGYM: retail NES Tetris is already MMC1 and TetrisGYM's default build fits inside its original 32 KB. We have far less slack. `docs/research.md` §4.1–4.2. |
 | **D6** | **Banks 0 and 1 remain byte-identical to the original except for a small, enumerated hook table.** Every Gym byte lives in bank 2+. | Makes "did we change the original game?" a mechanical question answerable by `cmp`, and keeps the release BPS patch small and auditable. |
 | **D7** | **Distribute a BPS patch only. Never publish a `.gb`.** | The ROM is copyrighted. `docs/research.md` §7. |
 | **D8** | **Gym code is authored in RGBDS assembly; build orchestration and asset tooling in Python 3 (stdlib only).** | Python 3 is already present on typical dev machines and in CI; `make`/`gcc` are not universally available. Keeps `git clone && python3 build.py` working with no system-wide installs. |
@@ -26,44 +26,46 @@
 ```
 tetris-gym-gb/
 ├── CLAUDE.md                  project principles; read this first
-├── README.md
+├── CONTRIBUTING.md            branch-and-PR workflow, what CI checks
 ├── build.py                   the entire build; no make, no gcc
+├── requirements-dev.txt       test-only dependency (PyBoy)
 ├── docs/
-│   ├── research.md            technical research (Phases 1-5)
-│   ├── community-research.md  community research + feature matrix (Phases 6-7)
+│   ├── research.md            technical research
+│   ├── community-research.md  community evidence, feature matrix, top 10
+│   ├── existing-hacks.md      reverse engineering of the community's ROMs
 │   ├── architecture.md        this file
-│   ├── roadmap.md             milestones + acceptance criteria
-│   └── decisions/             ADRs: NNNN-short-title.md, one per significant decision
+│   ├── roadmap.md             milestones and status  <-- single source of truth
+│   └── decisions/             ADRs, one per constraining decision
 ├── src/
-│   ├── original/              VENDORED, DO NOT EDIT casually  <-- see §3
-│   │   ├── code/  data/  gfx/  include/
-│   │   └── UPSTREAM.md        commit SHA, licence, and every local delta, enumerated
-│   ├── hooks/                 the ONLY edits to original banks; one file per hook
-│   │   └── hooks.inc
-│   └── gym/                   all Gym functionality (banks 2+)
-│       ├── gym.asm            bank map, trampoline, entry points
-│       ├── state.asm          Gym WRAM/SRAM layout
-│       ├── menu/              trainer selection UI
-│       ├── hud/               timer, DAS meter, stats rendering
-│       ├── modes/             ONE FILE PER TRAINER  <-- the extension point
-│       │   ├── sprint40.asm
-│       │   ├── seed.asm
-│       │   ├── garbage.asm
-│       │   └── ...
-│       └── lib/               bank-safe helpers, BCD, tilemap writes
+│   ├── original/              VENDORED, see UPSTREAM.md  <-- section 3
+│   ├── hooks/                 the only edits to original banks
+│   │   ├── hooks.inc          the declared hook table
+│   │   └── trampoline.inc     FarCall and the state-dispatch stub
+│   └── gym/
+│       ├── gym.asm            dispatch, level picker, instant restart, Gym RAM
+│       ├── random.asm         the SPS LFSR (lives in bank 1's empty space)
+│       ├── gravity.inc        extended 23-entry gravity table
+│       ├── levels.inc         shared level constants
+│       └── softreset.inc      bank-0 stub for instant restart
 ├── tools/
-│   ├── rgbds.py               download+verify+extract pinned RGBDS into build/toolchain/
-│   ├── verify.py              hash/diff the built ROM against the reference
-│   ├── bps.py                 BPS patch generation
-│   ├── gfx.py                 PNG -> 2bpp/1bpp with explicit expected sizes
-│   └── emu/                   headless emulator test harness
+│   ├── rgbds.py               fetch and verify the pinned toolchain
+│   ├── gfx.py                 PNG -> 2bpp/1bpp with asserted sizes
+│   ├── patch.py               apply UPS/BPS patches
+│   ├── analyze_hack.py        diff a community ROM against our build
+│   └── emu.py                 headless emulator harness
 ├── tests/
-│   ├── test_original.py       byte-exactness + "original banks unchanged"
-│   ├── test_freespace.py      per-bank budget assertions from the link map
-│   └── modes/                 one behavioural test file per trainer
-├── assets/
-└── build/                     gitignored: toolchain/, obj/, *.gb, *.sym, *.map, *.bps
+│   ├── test_original.py       byte-exactness and original constants
+│   ├── test_expansion.py      the declared-hooks diff
+│   ├── test_behaviour.py      gravity, hearts, timings
+│   ├── test_menu.py           level picker
+│   ├── test_restart.py        instant restart
+│   └── test_sps.py            seeded piece sequences
+└── build/                     gitignored: toolchain/, obj/, *.gb, *.sym, *.map
 ```
+
+`src/gym/` is flat while it is small. Split it into subdirectories when a
+directory would hold more than a handful of files, not before.
+
 
 ---
 
@@ -242,7 +244,7 @@ limit is the constraint there, not time.
 `python3 build.py` and nothing else. No `make`, no `gcc`, no system-wide installs.
 
 ```
-python3 build.py                 # default: GYM=1, MBC1, 128 KB, SRAM
+python3 build.py                 # default: GYM=1, MBC1, 64 KB, SRAM
 python3 build.py --original      # GYM=0: reproduce v1.1 byte-exact  (the regression test)
 python3 build.py --patch         # additionally emit build/tetrisgym.bps  (needs a user ROM)
 python3 build.py --freespace     # print per-bank free bytes from the link map
@@ -263,7 +265,7 @@ Stages:
 5. **Fix** — `rgbfix` sets cartridge type, ROM/RAM size and checksums.
 6. **Verify** — always: hash the ROM; assert banks 0–1 differ from the reference only at declared
    hook addresses; print per-bank free space.
-7. **Patch** (opt-in) — `tools/bps.py` produces a BPS against a user-supplied v1.1 ROM. Refuse
+7. **Patch** (opt-in) — `tools/patch.py` produces a BPS against a user-supplied v1.1 ROM. Refuse
    politely and skip if the ROM is absent, exactly as TetrisGYM's `build.js` does.
 
 Every build prints a budget line, because on this target space is a first-class concern:
@@ -313,7 +315,7 @@ inject inputs, assert on memory.
 * **Emulator choice:** prefer a scriptable, embeddable core over a GUI. **SameBoy** is the accuracy
   reference (passes mooneye-gb, blargg, Wilbert Pol suites; >99.9 % on ~2 800 commercial games) and
   is embeddable as a C library. A pure-Python core would keep the "stdlib only" promise but is slow
-  and less accurate. **Recommendation: define a thin `tools/emu/` interface, start with whatever is
+  and less accurate. **Recommendation: define a thin `tools/emu.py` interface, start with whatever is
   easiest to drive from CI, and keep the interface narrow so the core can be swapped.**
   Decide this in Milestone 1 and record it as an ADR.
 * **The tests that matter most are timing tests**, because timing *is* the product:
@@ -355,21 +357,21 @@ architecture.
 
 ---
 
-## 8. Extension model — adding a trainer
+## 8. Extension model — adding a feature
 
-The whole architecture exists to make this list short.
+1. Write the code in `src/gym/`. Keep it in bank 2 unless it must be reachable
+   while bank 1 is mapped, in which case use bank 1's empty space (as
+   `random.asm` does) or a bank-0 stub.
+2. If it needs to run inside an original state, route that state's jump-table
+   entry through `GymStateHook` and branch in `GymDispatch`.
+3. **If it changes bytes in banks 0 or 1**, declare the range in
+   `src/hooks/hooks.inc`, mirror it in `tests/test_expansion.py`, record it in
+   `src/original/UPSTREAM.md`, and justify it in the PR. Those get extra review.
+4. Add a behavioural test driving the ROM through `tools/emu.py`.
+5. Update `README.md` and `docs/roadmap.md`.
 
-1. Add `src/gym/modes/<name>.asm` exporting `Mode<Name>_Init`, `Mode<Name>_Frame`, `Mode<Name>_Exit`.
-2. Register it in the mode table in `src/gym/gym.asm` (name string, config range, bank).
-3. Add its state to `src/gym/state.asm` within the declared Gym WRAM ranges.
-4. Add `tests/modes/test_<name>.py`.
-5. **If it needs a new hook**, add it to `src/hooks/hooks.inc`, justify it in the PR, and update the
-   expected hook table in `tests/test_original.py`. **A PR that adds a hook gets extra review.**
-6. Document it in the README feature table.
-
-Most trainers in the feature matrix should need **steps 1–4 only**.
-
----
+**Prefer changing state over changing code.** Most features need no hook: set up
+RAM and the tilemap before gameplay starts and let the untouched original run.
 
 ## 9. What this architecture deliberately does not do
 

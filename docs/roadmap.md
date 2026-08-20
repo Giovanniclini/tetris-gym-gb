@@ -1,18 +1,35 @@
 # Roadmap
 
-**Status:** Proposed, 2026-08-20.
-Milestones are ordered by *risk retired per unit of effort*, not by feature glamour. Each has
+**This file is the single source of truth for project status.** README and
+CLAUDE.md point here rather than restating it, so there is one place to keep
+current.
+
+| Milestone | State |
+| --- | --- |
+| 0 — Reproduce the original ROM | **done** |
+| 0.5 — Cartridge expansion (MBC1, 64 KB, SRAM) | **done** — hardware checks outstanding |
+| 1 — Level picker, hearts, instant restart | **done** |
+| 2 — Core training features | **in progress** — SPS engine done, seed UI next |
+| 3 — Board control and information | not started |
+| 4 — Replay, tooling and polish | not started |
+| 5 — Hardware validation and 1.0 | not started |
+
+Outstanding across finished milestones, all needing hardware nobody has yet:
+SRAM persistence across a power cycle, and booting on a real DMG/GBC via a
+flash cart.
+
+Milestones are ordered by *risk retired per unit of effort*. Each has
 acceptance criteria that are objectively checkable.
 
-The suggested kickoff milestones were adjusted in two ways, based on the research:
+Two deviations from the original kickoff plan, both still standing:
 
-* **An extra milestone (M0.5) was inserted** to convert the cartridge to MBC1 *before* writing any
-  Gym feature. The original ROM has ~400 usable free bytes (`docs/research.md` §4.1), so without
-  this every feature milestone is blocked. Doing it as its own milestone means the riskiest
-  structural change is validated while the ROM is still otherwise byte-identical.
-* **The feature ordering follows Game Boy community evidence, not TetrisGYM's ordering.** The 40-line
-  sprint timer is Milestone 2's headline feature because it is the CTWC-GB qualification format and
-  the original game has no timer at all (`docs/community-research.md` §2.1, §6).
+* **M0.5 was inserted** to convert the cartridge to MBC1 before any feature.
+  The original ROM has ~400 usable free bytes, so without it every feature was
+  blocked. Doing it alone meant the riskiest structural change was validated
+  while the ROM was otherwise byte-identical.
+* **Feature order follows Game Boy community evidence, not TetrisGYM's.** SPS
+  is Milestone 2's headline because the community has asked for it by name
+  since 2022 (`docs/community-research.md` §6.2).
 
 ---
 
@@ -137,7 +154,7 @@ is the difference between one attempt and twenty.
 3. **Instant restart**: retarget the existing `A+B+Select+Start` soft reset to restart the current
    trainer with identical settings instead of rebooting.
 4. Gym config persisted to SRAM; restored on boot.
-5. Headless emulator harness (`tools/emu/`) + first behavioural tests. **Record the emulator choice
+5. Headless emulator harness (`tools/emu.py`) + first behavioural tests. **Record the emulator choice
    as an ADR** (`docs/decisions/`).
 
 **Acceptance criteria**
@@ -151,14 +168,23 @@ is the difference between one attempt and twenty.
 
 ---
 
+**Status 2026-08-20: complete.** Level picker reaching A–M, hearts on Select
+with an indicator, instant restart from a game and everything downstream of it,
+and a headless emulator harness. Verified in an emulator and by hand.
+
+---
+
 ## Milestone 2 — Core training features
 
 **Goal:** the product becomes genuinely useful to a CTWC-GB competitor — and specifically, reaches
 the bar the GBTetris Discord named for a physical cart run: *"SPS + extended level select +
 whatever else"* (`docs/community-research.md` §3.4).
 
-**Reordered 2026-08-20** after first community contact. Work follows the revised list in
-`docs/community-research.md` §6.1:
+**Status 2026-08-20: SPS engine done** — the community's LFSR, interoperable,
+verified against their ROM (`docs/existing-hacks.md` §4). No seed UI yet, so it
+is not reachable by a player. That is the next change.
+
+Work follows the revised list in `docs/community-research.md` §6.2:
 
 1. **SPS — standardised same piece sequence** (§6.2 #1). *The headline feature.* Design is now
    settled by reverse engineering the existing seeded ROM (`docs/existing-hacks.md` §4):
