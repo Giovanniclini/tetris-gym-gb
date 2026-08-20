@@ -50,6 +50,13 @@ different piece of the original gets to the buttons first.
 * Restart covers `$00` playing, `$01` game-over init, `$0D` screen clearing and
   `$04` end-of-game. High-score entry is deliberately left alone so scores can
   still be entered.
+* **You get the level you chose, not the level you reached.** `hATypeLevel`
+  (`$FFC2`) holds the menu choice and is never written during play;
+  `hATypeLinesThresholdToPassForNextLevel` (`$FFA9`) is the live level and
+  climbs with the line count. Re-running the init copies the former into the
+  latter, so starting on 8 and levelling to 9 restarts on 8. That is the right
+  default for a trainer - "again" means the drill you set up. Restarting at the
+  level reached would be a separate option, not this one.
 
 ## What this cost to find
 

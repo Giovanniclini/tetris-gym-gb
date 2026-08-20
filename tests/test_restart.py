@@ -143,6 +143,34 @@ def test_restart_works_after_topping_out():
         assert t[hATypeLevel] == 22, "level lost restarting from game over"
 
 
+def test_restart_returns_to_the_chosen_level_not_the_one_reached():
+    """Start on 8, level up to 9, restart: you get 8 back.
+
+    Two variables carry the level. hATypeLevel ($FFC2) is the menu choice and
+    is never written during play; hATypeLinesThresholdToPassForNextLevel
+    ($FFA9) is the live level and climbs as lines are cleared. Restarting
+    re-runs the init, which copies the former into the latter.
+
+    This is the right default for a trainer - "again" means the drill you set
+    up, not wherever you happened to reach.
+    """
+    live = 0xFFA9
+    with Tetris(ROM) as t:
+        t.start_game_at(8)
+        t.tick(60)
+        assert t[hATypeLevel] == 8 and t[live] == 8
+        gravity_at_8 = t.gravity()
+
+        t.pb.memory[live] = 9                 # as if a level-up had happened
+        t.tick(60)
+        assert t[hATypeLevel] == 8, "the menu choice must not move with the level"
+
+        combo(t)
+        wait_playing(t)
+        assert t[live] == 8, f"restarted on level {t[live]}, expected 8"
+        assert t.gravity() == gravity_at_8
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":
