@@ -2,8 +2,9 @@
 
 **A TetrisGYM-style training and practice ROM for the original Nintendo Game Boy Tetris (1989).**
 
-> **Status: research and design complete. No implementation code yet.**
-> Start with [`docs/roadmap.md`](docs/roadmap.md) — Milestone 0.
+> **Status:** see [`docs/roadmap.md`](docs/roadmap.md).
+> Working today: level select up to M, hearts, and instant restart. SPS works
+> but has no seed entry yet.
 
 ---
 
@@ -47,28 +48,25 @@ This is deliberately **not** a modernisation. No hold, no hard drop, no ghost pi
 [Tetris — Rosy Retrospection](https://www.romhacking.net/hacks/5813/) already does that well, and
 does not need competition.
 
-## Planned features
+## What it does
 
-Ranked from [`docs/community-research.md`](docs/community-research.md) §6.2, after reading five
-years of the community's own discussion. They had already written the product definition themselves:
+**Working today**
 
-> *"a competition rom with **A-M starts and SPS** would be the top of the list"*
+| | |
+| --- | --- |
+| **Level select to M** | Levels `0-9` and `A-M` from a picker beside the original grid — `M` is one row per frame, the engine's ceiling |
+| **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
+| **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
 
-1. **SPS — same piece sequence** — seeded, shareable piece sequences. Asked for by name since 2022 and **never finished**. The wedge.
-2. **Extended level select A–M (10–22) + score uncap** — matching the community's de-facto standard "KLM" ROM
-3. **40-line sprint with a built-in frame timer** — the live tournament qualification format
-4. **Instant restart / zero-friction reset into the drill**
-5. **Transition trainer** — the 9→10, 100-line grind people complain about most
-6. **Hz / tap-rate counter** — requested, doesn't exist
-7. **Floor mode / preset boards / garbage height**
-8. **Low stack**
-9. **VS-style garbage and dig practice**
-10. **Savestates, board editor, DAS control, piece statistics**
+**Next**
 
-**What's different about this project isn't the feature list — it's the foundation.** Several of
-these already exist as separate, unmaintained binary patches. None of them build from source, none
-have tests, and an attempt to restructure the main one broke it. This project starts from a
-disassembly that reproduces the original ROM byte-exactly, with that check running on every commit.
+SPS — same piece sequence — seeded and shareable, so two players get identical
+pieces. The generator is done and verified interoperable with the community's
+own seeded ROM; it needs seed entry to be reachable.
+
+After that: transition trainer, Hz counter, floor and preset boards, low stack,
+VS garbage. Ranked from community evidence in
+[`docs/community-research.md`](docs/community-research.md) §6.2.
 
 ## Technical approach
 
