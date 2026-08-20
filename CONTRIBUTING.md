@@ -38,7 +38,7 @@ The behavioural tests need PyBoy, a test-only dependency:
 
 ```
 python3 -m venv .venv
-.venv/bin/python -m pip install pyboy
+.venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python tests/test_behaviour.py
 .venv/bin/python tests/test_menu.py
 .venv/bin/python tests/test_restart.py
