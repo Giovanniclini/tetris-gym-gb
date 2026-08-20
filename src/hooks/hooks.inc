@@ -45,6 +45,10 @@
 ;                                            between the sound engine and the
 ;                                            sound thunks in bank 1. A new
 ;                                            section in a gap, not an insertion.
+;   HOOK_STATE_TABLE15 $0325-$0326        2  Jump-table entry for $15, high
+;                                            score name entry, so the reset
+;                                            combination restarts the drill
+;                                            rather than rebooting.
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.

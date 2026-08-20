@@ -103,6 +103,8 @@ GymDispatch::
 	ldh  a, [hGameState]
 	cp   GS_LEVEL_ENDED_MAIN
 	jr   z, .levelEnded
+	cp   GS_ENTERING_HIGH_SCORE
+	jr   z, .nameEntry
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
 
@@ -126,9 +128,7 @@ GymDispatch::
 ; Catch the combination here instead, which is what makes "top out, go again"
 ; work.
 .levelEnded:
-	ldh  a, [hButtonsHeld]
-	and  PADF_START|PADF_SELECT|PADF_B|PADF_A
-	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A
+	call GymResetComboHeld
 	jr   nz, .runLevelEnded
 
 	call GymInGameReset             ; state is GS_LEVEL_ENDED_MAIN: restarts
@@ -137,6 +137,20 @@ GymDispatch::
 
 .runLevelEnded:
 	ld   hl, GameState04_LevelEndedMain
+	ret
+
+; Typing a high score name. Restarting here abandons the score, which is the
+; point: when you are drilling you want another go, not a leaderboard entry.
+.nameEntry:
+	call GymResetComboHeld
+	jr   nz, .runNameEntry
+
+	call GymInGameReset
+	ld   hl, Stub_148c
+	ret
+
+.runNameEntry:
+	ld   hl, GameState15_EnteringHighScore
 	ret
 
 
@@ -196,6 +210,19 @@ GymLevelSelectInit::
 
 
 GymLevelSelectMain::
+; While the reset combination is held, do not let the menu act on Start. It is
+; part of the combination, so the menu would start a game that is then rebooted
+; a frame later - you see it flash up on screen before the logo returns.
+	call GymResetComboHeld
+	jr   nz, .notResetting
+
+	ldh  a, [hButtonsPressed]
+	res  PADB_START, a
+	res  PADB_A, a
+	ldh  [hButtonsPressed], a
+	ret
+
+.notResetting:
 	ld   a, [wGymRedrawPending]
 	and  a
 	jr   z, .readInput
@@ -424,6 +451,14 @@ GymDrawHearts::
 ; reboots a moment later - so the buttons are consumed here.
 ; ---------------------------------------------------------------------------
 
+; Z is set when the soft-reset combination is held.
+GymResetComboHeld::
+	ldh  a, [hButtonsHeld]
+	and  PADF_START|PADF_SELECT|PADF_B|PADF_A
+	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A
+	ret
+
+
 GymInGameReset::
 ; Link play still reboots: restarting one side of a two-player game would
 ; desync the cable, and the original behaviour is the safe one there.
@@ -455,6 +490,8 @@ GymInGameReset::
 	cp   GS_LEVEL_ENDED_MAIN
 	jr   z, .restart
 	cp   GS_GAME_OVER_SCREEN_CLEARING
+	jr   z, .restart
+	cp   GS_ENTERING_HIGH_SCORE
 	jr   z, .restart
 
 ; Anywhere else, reboot exactly as the original does. Note this includes
