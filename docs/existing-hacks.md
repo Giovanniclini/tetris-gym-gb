@@ -66,7 +66,70 @@ This confirms the community's own figures exactly: M-J's *"L is 2 frames/row com
 3"*, and *"26400 for tetris"* on L, which is `(21 + 1) × 1200` — the score multiplier extends
 naturally with no table change.
 
-### 3.2 Structure
+### 3.2 A bug: the level-up cap was not raised
+
+**[VERIFIED EMPIRICALLY 2026-08-20 — reproduced in an emulator, not inferred]**
+
+KLM extends the gravity table to 23 entries but **leaves the level-up cap at `$14` (level 20)**.
+The check is byte-identical to stock:
+
+```asm
+    ld   hl, hATypeLinesThresholdToPassForNextLevel   ; $FFA9 holds the level
+    ld   a, [hl]
+    cp   $14              ; stock $2458 / KLM $2449 - unchanged
+    ret  z                ; stop levelling only when the level is exactly 20
+```
+
+It stops only on **exact equality with 20**. Start on L (21) or M (22) and the level never equals
+20, so it keeps incrementing — 23, 24, 25 — and the gravity lookup indexes past the end of the
+table into the code that follows it.
+
+Measured by running the real KLM ROM in an emulator and reading the gravity value the game loads:
+
+| Level | Display | Frames/row | |
+| --- | --- | --- | --- |
+| 20 | `K` | 3 | |
+| 21 | `L` | 2 | |
+| 22 | `M` | 1 | last real entry |
+| **23** | `N` | **202** | reads `$C9` — *slower than level 0* |
+| **24** | `O` | **63** | reads `$3E` |
+| **25** | `P` | **2** | reads `$01` |
+
+**Practical impact: low but real.** Reaching it needs a level-up from an L or M start, which takes
+roughly 220 line clears at 2 frames per row — nobody has come close. But the failure is silent and
+absurd when it happens: the game would abruptly become slower than level 0, then jump around.
+
+**Our fix** (`src/original/UPSTREAM.md` deviation #4) raises the cap to `MAX_LEVEL` (`$16` = 22), a
+one-byte change. Capping the *source* is the right fix; padding the table would only move the cliff.
+
+**This is worth reporting upstream.** It is a concrete, reproducible finding, and offering it costs
+nothing.
+
+### 3.3 Implementation cost: the same feature, two ways
+
+Adding levels L and M is one table extension. What it costs depends entirely on whether you are
+editing a binary or a disassembly.
+
+| | KLM | tetris-gym-gb |
+| --- | --- | --- |
+| Approach | Relocate the table to `$1AF1` to make room | Put a 23-entry table in reclaimed `$ff` padding, redirect the pointer |
+| Bytes changed in the original banks | **20 870** | **54** |
+| Regions changed | **80** | **6** |
+| Bank 0 layout | Everything after the table shifts | Unchanged |
+| Reviewable? | No — a 20 KB binary diff | Yes — every changed byte is declared and asserted |
+| Level-up cap | Missed (§3.2) | Raised, one byte |
+
+**386× smaller diff for identical behaviour.** The difference is not skill; it is that a disassembly
+lets the linker do relocation. "Add two entries to a table" is two lines of source, and everything
+downstream moves automatically. In a binary, the same edit forces a hand-maintained cascade through
+two thirds of the ROM — which is precisely why *"I tried restructuring the code and ended up breaking
+the whole project"* (§3.5.8 of `docs/community-research.md`) was the outcome, and why no hack has
+ever been merged with another.
+
+Our 54 bytes break down as: 23 for the table, 22 for the far-call trampoline (Milestone 0.5), 2 for
+the table pointer, 1 for the level cap, 6 for cartridge header and checksums.
+
+### 3.4 Structure
 
 Relocating the table shifted everything after it, so KLM differs from stock in **20 870 bytes across
 80 regions — 64 % of the ROM** — despite being, conceptually, a handful of edits. It is a whole-binary

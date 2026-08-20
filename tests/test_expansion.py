@@ -74,6 +74,25 @@ def test_trampoline_fits_its_declared_padding():
     assert used <= 38, f"trampoline uses {used} of 38 available bytes"
 
 
+def test_level_cap_raised_for_l_and_m():
+    """docs/existing-hacks.md 3.2: with L and M selectable the level-up cap
+    must rise, or levelling up runs past the gravity table into code. KLM has
+    this bug; measured, its level 23 loads 202 frames/row."""
+    ref, gym = _build("--original"), _build()
+    assert ref[0x2459] == 0x14, "stock cap should be $14 (level 20)"
+    assert gym[0x2459] == 0x16, f"Gym cap should be $16 (level 22), got ${gym[0x2459]:02X}"
+    assert gym[0x2458] == 0xFE, "expected `cp n8` opcode at $2458"
+
+
+def test_extended_gravity_table_contents():
+    """The 23-entry table must match stock for 0-20 and KLM for L and M."""
+    ref, gym = _build("--original"), _build()
+    table = gym[0x000B:0x000B + 23]
+    assert list(table[:21]) == list(ref[0x1B06:0x1B06 + 21]), "levels 0-20 changed"
+    assert table[21] == 0x01, "L should be 2 frames/row"
+    assert table[22] == 0x00, "M should be 1 frame/row (the engine ceiling)"
+
+
 def test_gym_cartridge_header():
     d = _build()
     assert d[0x147] == CART_MBC1_RAM_BATTERY, f"cart type ${d[0x147]:02X}"
