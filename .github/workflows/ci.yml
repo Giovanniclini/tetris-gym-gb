@@ -42,8 +42,10 @@ jobs:
       - name: Rebuild the original ROM
         run: python3 build.py --original --freespace
 
-      - name: Build the Gym ROM
-        run: python3 build.py
+      # --patch also emits the BPS a release ships, and verifies that applying
+      # it to the stock ROM reproduces this build.
+      - name: Build the Gym ROM and the release patch
+        run: python3 build.py --patch
 
       - name: Byte-level tests
         run: |

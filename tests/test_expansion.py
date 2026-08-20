@@ -118,6 +118,24 @@ def test_no_sram_variant_builds():
     assert d[0x149] == 0x00, "RAM size should be none"
 
 
+def test_the_release_patch_reproduces_the_rom():
+    """Releases ship a patch and nothing else (CLAUDE.md principle 10), so the
+    patch - not the ROM - is what has to be right."""
+    sys.path.insert(0, str(ROOT))
+    from tools import patch
+
+    gym = _build("--patch")
+    bps = (ROOT / "build" / "tetrisgym.bps").read_bytes()
+    stock = (ROOT / "build" / "tetris.gb").read_bytes()
+
+    assert bps[:4] == b"BPS1", f"not a BPS patch: {bps[:4]!r}"
+    assert len(bps) < len(gym) // 8, (
+        f"patch is {len(bps)} bytes against a {len(gym)}-byte ROM - "
+        "that is large enough to be carrying game data"
+    )
+    assert patch.apply(stock, bps) == gym, "the patch does not reproduce the ROM"
+
+
 def test_original_build_still_byte_exact():
     """Milestone 0's guarantee must survive Milestone 0.5."""
     d = _build("--original")

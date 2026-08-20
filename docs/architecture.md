@@ -269,8 +269,9 @@ Stages:
 5. **Fix** — `rgbfix` sets cartridge type, ROM/RAM size and checksums.
 6. **Verify** — always: hash the ROM; assert banks 0–1 differ from the reference only at declared
    hook addresses; print per-bank free space.
-7. **Patch** (opt-in) — `tools/patch.py` produces a BPS against a user-supplied v1.1 ROM. Refuse
-   politely and skip if the ROM is absent, exactly as TetrisGYM's `build.js` does.
+7. **Patch** (opt-in) — `--patch` emits `build/tetrisgym.bps` and verifies it round-trips. The
+   source is our own byte-exact rebuild of the stock ROM, so cutting a release needs no copy of
+   it; only *using* a release does.
 
 Every build prints a budget line, because on this target space is a first-class concern:
 
