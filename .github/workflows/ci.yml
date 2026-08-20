@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # macOS is expensive on a private repo (10x minute multiplier) and slow to
+    # schedule, so it is checked weekly rather than on every push.
+    - cron: '0 6 * * 1'
+
+# A new push supersedes the previous run on the same ref. Without this, ten
+# pushes leave ten runs queued.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      # The pinned RGBDS tarball never changes unless tools/rgbds.py does.
+      - name: Cache the RGBDS toolchain
+        uses: actions/cache@v4
+        with:
+          path: build/toolchain
+          key: rgbds-${{ runner.os }}-${{ hashFiles('tools/rgbds.py') }}
+
+      # The ground truth: the stock ROM must still rebuild byte for byte.
+      # If this fails the change is wrong. See CLAUDE.md principle 4.
+      - name: Rebuild the original ROM
+        run: python3 build.py --original --freespace
+
+      - name: Build the Gym ROM
+        run: python3 build.py
+
+      - name: Byte-level tests
+        run: |
+          python3 tests/test_original.py
+          python3 tests/test_expansion.py
+
+      - name: Install the test-only emulator dependency
+        run: python3 -m pip install pyboy
+
+      - name: Behavioural tests
+        run: |
+          python3 tests/test_behaviour.py
+          python3 tests/test_menu.py
+          python3 tests/test_restart.py
+
+      # Patches only, never ROM data. See docs/research.md section 7.
+      - name: Assert no ROM data is tracked
+        run: |
+          if git ls-files | grep -iE '\.(gb|gbc|nes|bps|ips)$'; then
+            echo "::error::ROM or patch data is tracked in git"
+            exit 1
+          fi
+          echo "ok: no ROM data tracked"
+
+  macos:
+    name: macOS build (weekly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Rebuild the original ROM
+        run: python3 build.py --original
