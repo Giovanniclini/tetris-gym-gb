@@ -1,0 +1,36 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  byte-exact:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-13]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # The ground truth: the stock ROM must still rebuild byte for byte.
+      # If this fails, the change is wrong. See CLAUDE.md principle 4.
+      - name: Rebuild the original ROM
+        run: python3 build.py --original --freespace
+
+      - name: Run tests
+        run: python3 tests/test_original.py
+
+      # Never publish ROM data - patches only. See docs/research.md section 7.
+      - name: Assert no ROM artifact is exported
+        run: |
+          if git ls-files --error-unmatch '*.gb' 2>/dev/null; then
+            echo "::error::a .gb file is tracked in git"
+            exit 1
+          fi
+          echo "ok: no ROM data tracked"

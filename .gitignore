@@ -5,3 +5,7 @@ build/
 *.map
 *.lst
 *.sym
+*.bps
+*.ips
+__pycache__/
+*.pyc
