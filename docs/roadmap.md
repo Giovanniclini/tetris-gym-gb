@@ -7,8 +7,8 @@ current.
 | Milestone | State |
 | --- | --- |
 | 0 — Reproduce the original ROM | **done** |
-| 0.5 — Cartridge expansion (MBC1, 64 KB, SRAM) | **done** — hardware checks outstanding |
-| 1 — Level picker, hearts, instant restart | **done** |
+| 0.5 — Cartridge expansion (MBC1, 64 KB, SRAM) | **done** — the cartridge has SRAM; nothing writes to it yet |
+| 1 — Level picker, hearts, instant restart | **done** — except SRAM persistence, see below |
 | 2 — Core training features | **in progress** — SPS done; transition trainer next |
 | 3 — Board control and information | not started |
 | 4 — Replay, tooling and polish | not started |
@@ -18,9 +18,13 @@ current.
 gate below. BPS patch on
 [Releases](https://github.com/Giovanniclini/tetris-gym-gb/releases).
 
-Outstanding across finished milestones, all needing hardware nobody has yet:
-SRAM persistence across a power cycle, and booting on a real DMG/GBC via a
-flash cart.
+Outstanding across finished milestones:
+
+* **SRAM persistence is not implemented.** The cartridge declares 8 KB of
+  battery RAM (M0.5) but no code writes to it, so settings and high scores live
+  in WRAM: they survive the soft reset, not a power cycle. M1 work item 4 was
+  never done, and the milestone was marked complete without it.
+* Booting on a real DMG/GBC via a flash cart — needs hardware nobody has yet.
 
 Milestones are ordered by *risk retired per unit of effort*. Each has
 acceptance criteria that are objectively checkable.
