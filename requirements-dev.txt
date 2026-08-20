@@ -1,0 +1,7 @@
+# Test-only dependencies.
+#
+# The build itself needs nothing beyond Python 3 - `python3 build.py` works on a
+# bare machine, and the RGBDS toolchain is fetched and checksummed by
+# tools/rgbds.py. Only the behavioural tests need anything installed, because
+# they drive the ROM in an emulator. See docs/decisions/0004.
+pyboy==2.7.0
