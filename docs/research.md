@@ -574,6 +574,41 @@ only a few dozen bytes to spare."*
 **Therefore the ROM must be expanded, and an MBC must be added.** This is not a preference; it is
 arithmetic.
 
+### 4.1a Game Boy Color auto-palette: a testing gotcha, not a regression
+
+**[VERIFIED LOCALLY, 2026-08-20]**
+
+Original Game Boy Tetris is a DMG game: four shades of grey, no colour. The familiar blue/red
+Tetris palette people see comes from the **Game Boy Color boot ROM**, which colourises
+Nintendo-published DMG games automatically.
+
+**The first thing you notice on running the expanded Gym build in mGBA is that it turns
+greyscale.** That is an emulator artefact, not a ROM problem:
+
+* The CGB boot ROM's palette lookup uses only the **16 title bytes** (`$0134-$0143`), the byte at
+  `$0137` to break ties, and the **old licensee code** at `$014B` (must be `$01` = Nintendo).
+  All are **byte-identical** between our stock and Gym builds — title checksum `$DB`, 4th
+  character `R`, licensee `$01`. Nothing the MBC1 conversion touches (`$0147`-`$0149`, `$014D`,
+  `$014F`) is an input to that algorithm.
+* **mGBA does not use that algorithm.** It ships a No-Intro game database at
+  `share/mgba/nointro.dat` and matches ROMs by **CRC32**. Our stock build matches
+  `Tetris (World) (Rev 1).gb  crc 46df91ad` exactly; the Gym build's CRC `5C61448D` is not in the
+  database, so mGBA falls back to greyscale.
+
+**Fix for testing:** in mGBA, *Settings → Game Boy → Game Boy model → **Game Boy Color***. That
+forces CGB mode regardless of database recognition.
+
+**A useful side-effect:** mGBA's bundled No-Intro database lists
+`Tetris (World) (Rev 1).gb` with `crc 46df91ad` and
+`sha1 74591cc9501af93873f9a5d3eb12da12c0723bbc` — **exactly what `build.py --original` produces**.
+That is independent third-party confirmation that our build is the genuine verified dump, from a
+source we did not choose and cannot influence.
+
+**Still to verify:** that real Game Boy Color hardware colourises the expanded ROM identically.
+The analysis above says it must, but it rests on our reading of the boot ROM's inputs. Added to
+the Milestone 5 hardware checklist. Any emulator that keys colour off a ROM database rather than
+the boot ROM algorithm will show grey — expect users to report this, and document it.
+
 ### 4.2 Compatibility of an expanded ROM
 
 * **Emulators:** MBC1 is the most widely and correctly implemented mapper in existence. SameBoy,

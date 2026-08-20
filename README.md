@@ -105,6 +105,18 @@ therefore costs nothing to emulator, flash-cart, Analogue Pocket or MiSTer users
 affects are those building their own repro cartridges, who now need a board with an MBC1 and battery
 SRAM rather than a bare 32 KB flash chip.
 
+## Known quirk: greyscale in some emulators
+
+Game Boy Tetris is a DMG game — it has no colour of its own. The familiar palette comes from the
+Game Boy Color boot ROM, which colourises Nintendo-published games automatically.
+
+The patched ROM keeps every input to that lookup byte-identical, so **on real Game Boy Color
+hardware it colourises exactly like the original**. But some emulators — mGBA among them —
+identify games by CRC32 against a database instead, and a patched ROM naturally isn't in it, so
+they fall back to greyscale.
+
+In mGBA: *Settings → Game Boy → Game Boy model → **Game Boy Color***.
+
 ## Documentation
 
 | | |

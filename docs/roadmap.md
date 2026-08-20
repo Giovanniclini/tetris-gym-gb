@@ -257,6 +257,11 @@ GBTetris Discord. Real feedback should reorder everything after this point.
    Analogue Pocket, MiSTer — on EverDrive GB and EZ-Flash Junior.
 2. SRAM corruption testing: power-cut during save; battery-dead behaviour; version-mismatch handling.
 3. Emulator matrix: SameBoy, BGB, Emulicious, mGBA.
+3b. **Verify Game Boy Color auto-palette on real hardware.** The expanded ROM keeps every input to
+   the CGB boot ROM's palette lookup byte-identical (`docs/research.md` §4.1a), so it should
+   colourise exactly like the original — but that is analysis, not observation. Emulators that key
+   colour off a ROM database rather than the boot ROM (mGBA does) will show greyscale; document it
+   so users do not report it as a bug.
 4. Timing audit: re-verify every original constant against the reference build.
 5. Documentation pass; BPS release pipeline; `docs/decisions/` complete.
 6. **Optional stretch:** a 32 KB no-MBC "purist" build for reflashed original cartridges.
