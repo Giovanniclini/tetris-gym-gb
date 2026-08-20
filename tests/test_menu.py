@@ -31,16 +31,23 @@ BANK_TILES = [
 ]
 
 GRAVITY_L, GRAVITY_M = 2, 1
+GRAVITY_TABLE = [53, 49, 45, 41, 37, 33, 28, 22, 17, 11,
+                 10, 9, 8, 7, 6, 6, 5, 5, 4, 4, 3, 2, 1]
+
+
+def to_bank_from_here(t, bank):
+    """Cycle to a bank from an already-open level select screen."""
+    t.press("down")                       # onto the bottom row
+    while t[wGymLevelBank] != bank:
+        t.press("down")
+    return t
 
 
 def to_bank(t, bank):
     """Cycle to a bank. Down on the bottom row advances; the first Down from
     level 0 just moves the cursor there."""
     t.to_level_select()
-    t.press("down")                       # cursor 0 -> 5, still bank 0
-    while t[wGymLevelBank] != bank:
-        t.press("down")
-    return t
+    return to_bank_from_here(t, bank)
 
 
 def test_each_bank_draws_the_right_tiles():
@@ -134,6 +141,43 @@ def test_l_and_m_are_reachable_through_the_menu_alone():
             assert t.gravity() == gravity, (
                 f"level {level}: expected {gravity} frames/row, got {t.gravity()}"
             )
+
+
+def test_hearts_are_not_offered_where_they_would_slow_the_game():
+    """Hard mode is min(level + 10, 20). That ceiling predates L and M, so at
+    K, L or M it clamps downward - M with hearts runs at 3 frames per row
+    instead of 1, three times slower. KLM has the same behaviour.
+
+    Rather than change the original formula, which normal heart games depend
+    on, hearts are simply not offered in the K-M bank, where they can never
+    help.
+    """
+    with Tetris(ROM) as t:
+        t.to_level_select(hearts=True)          # armed the original way
+        assert t[hIsHardMode] != 0
+        to_bank_from_here(t, 2)
+        assert t[hIsHardMode] == 0, "hearts should be cleared on entering K-M"
+        t.press("select")
+        assert t[hIsHardMode] == 0, "Select must not arm hearts in K-M"
+
+
+def test_heart_speeds_are_unchanged_for_the_original_levels():
+    """The original formula must be untouched for levels 0-20: a normal heart
+    game saturates at level-20 speed from in-game level 10 onward."""
+    for level, expected in ((0, 10), (5, 15), (9, 19), (12, 20), (19, 20)):
+        with Tetris(ROM) as t:
+            t.start_game_at(level, hearts=True)
+            assert t.gravity() == GRAVITY_TABLE[expected], (
+                f"heart level {level}: expected level {expected} speed"
+            )
+
+
+def test_hearts_indicator_shows_when_armed_at_the_title_screen():
+    """The layout is copied over the screen after our init runs, so the
+    indicator is painted a frame later."""
+    with Tetris(ROM) as t:
+        t.to_level_select(hearts=True)
+        assert t[HEART_CELL] == TILE_HEART, "indicator missing for title-armed hearts"
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

@@ -105,6 +105,41 @@ one-byte change. Capping the *source* is the right fix; padding the table would 
 **This is worth reporting upstream.** It is a concrete, reproducible finding, and offering it costs
 nothing.
 
+### 3.2b A second bug: hearts make K, L and M *slower*
+
+**[VERIFIED EMPIRICALLY 2026-08-20]**
+
+Hard mode ("hearts") is `min(level + 10, 20)`, and that ceiling of 20 was written when 20 was the
+highest level in the game:
+
+```asm
+    ld   a, $0a
+    add  e            ; level + 10
+    cp   $15          ; >= 21 ?
+    jr   c, .getIndexInDE
+    ld   a, $14       ; clamp to 20
+```
+
+Once L (21) and M (22) exist, `level + 10` overflows the ceiling and the clamp pulls the speed
+*down*:
+
+| Level | Plain | With hearts | |
+| --- | --- | --- | --- |
+| 9 | 11 f/row | 4 f/row | hearts help, as intended |
+| K (20) | 3 | 3 | no-op |
+| **L (21)** | **2** | **3** | **hearts are slower** |
+| **M (22)** | **1** | **3** | **hearts are three times slower** |
+
+KLM's copy of this routine is byte-identical to stock apart from the table pointer, so **KLM has
+this too**. Unlike the level-cap bug in §3.2 it is trivially reachable: arm hearts on the title
+screen, pick M.
+
+**Our fix is deliberately not in the formula.** Raising the ceiling would change how *normal* heart
+games behave — a heart game saturates at level-20 speed from in-game level 10 onward, and players
+rely on that. Instead the Gym simply does not offer hearts in the K-M bank, where they can never
+help: at K they are a no-op and at L and M they only slow the game down. Hearts are cleared on
+entering that bank and Select is ignored there. Zero bytes of the original formula change.
+
 ### 3.3 Implementation cost: the same feature, two ways
 
 Adding levels L and M is one table extension. What it costs depends entirely on whether you are

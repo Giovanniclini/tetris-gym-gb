@@ -46,7 +46,12 @@ wGymState::
 ; Which block of ten levels the cursor is showing: 0 = 0-9, 1 = A-J, 2 = K-M.
 wGymLevelBank:: db
 
-	ds 1023
+; Set on entering the level select screen. The original's init copies the whole
+; layout back over the screen after we run, so the Gym's cells and hearts
+; indicator have to be painted on the frame after, not during init.
+wGymRedrawPending:: db
+
+	ds 1022
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -114,6 +119,9 @@ GymLevelSelectInit::
 	ldh  [hATypeLevel], a
 	ld   a, b
 	ld   [wGymLevelBank], a
+
+	ld   a, 1
+	ld   [wGymRedrawPending], a
 	ret
 
 
@@ -124,6 +132,15 @@ GymLevelSelectInit::
 ;     ignores these (`cp $05 / jr nc`), we use them to cycle the level bank
 ;   - Select: the original never tests it on this screen
 GymLevelSelectMain::
+; Repaint once, on the frame after the original init has drawn the layout.
+	ld   a, [wGymRedrawPending]
+	and  a
+	jr   z, .readInput
+	xor  a
+	ld   [wGymRedrawPending], a
+	call GymRedrawLevelScreen
+
+.readInput:
 	ldh  a, [hButtonsPressed]
 	ld   c, a
 
@@ -138,8 +155,20 @@ GymLevelSelectMain::
 ; Select toggles hard mode ("hearts"). The original arms it with an
 ; undocumented Down+Start on the title screen, two screens earlier, with no
 ; feedback until a heart appears here. It never tests Select on this screen.
+; Hearts are min(level + 10, 20). That ceiling was written when 20 was the
+; highest level, so at K, L or M it clamps *downward* - M with hearts drops
+; from 1 frame per row to 3, making hearts three times slower. Rather than
+; touch the original formula, which normal heart games rely on, we simply do
+; not offer hearts where they cannot help: at K, L and M the speed already
+; meets or exceeds anything hearts could add.
+	ld   a, [wGymLevelBank]
+	cp   GYM_LEVEL_BANKS - 1
+	jr   z, .skipHearts
+
 	bit  PADB_SELECT, c
 	jr   nz, .toggleHearts
+
+.skipHearts:
 
 	ld   a, [wGymLevelBank]
 	cp   GYM_LEVEL_BANKS - 1
@@ -242,6 +271,9 @@ GymLevelSelectMain::
 	jr   c, .afterClamp
 	ld   a, GYM_TOP_BANK_COUNT - 1
 	ldh  [hATypeLevel], a
+
+	xor  a                          ; hearts cannot help at K-M; see above
+	ldh  [hIsHardMode], a
 
 .afterClamp:
 	call .consumeMovement
