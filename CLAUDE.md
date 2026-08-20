@@ -25,6 +25,7 @@ It is **not** a new Tetris implementation, and **not** a modernisation.
 | `docs/community-research.md` | Community research, evidence strength, the full feature matrix, and the **TOP 10 features** |
 | `docs/architecture.md` | Current architecture decisions (D1–D8), repository layout, the original/Gym code boundary, memory plan, build system, testing strategy |
 | `docs/roadmap.md` | Current milestones and acceptance criteria |
+| `docs/existing-hacks.md` | Reverse engineering of the community's ROM hacks — KLM's extended gravity table, the SPS LFSR, what we must match |
 | `docs/decisions/` | Architecture Decision Records for anything significant decided later |
 
 **If a task touches architecture, memory layout, the build, the ROM version, or the

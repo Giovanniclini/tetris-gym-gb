@@ -128,12 +128,12 @@ is the difference between one attempt and twenty.
 
 **Work**
 1. Gym menu on an unused `hGameState` jump-table slot, reachable from the title screen.
-2. **Start on any level 0–20 (A–K) with a heart-level toggle** — write `hATypeLevel` and the gravity
-   reload value from the table at `$1B06`.
-   **Scope note:** deliberately stops at K (level 20). Every value up to K comes from the game's own
-   table and needs no guessing. KLM's L (21) and M (22) are *not* publicly available
-   (`docs/community-research.md` §3.5.1a) — we have one chat message for L's speed and nothing for
-   M. Extend to L–M in a follow-up once KLM can be matched directly.
+2. **Start on any level 0–22 (0–9, A–M) with a heart-level toggle** — write `hATypeLevel` and the
+   gravity reload value from the table at `$1B06`.
+   **Scope restored to A–M**: KLM has been reverse engineered (`docs/existing-hacks.md` §3), so L
+   and M are exactly specified — extend the table to 23 entries with L = `$01` (2 frames/row) and
+   M = `$00` (1 frame/row, the engine's hard ceiling). The score multiplier `(level+1) × base`
+   extends with no table change. Match KLM exactly; verify L scores 26 400 per Tetris.
 3. **Instant restart**: retarget the existing `A+B+Select+Start` soft reset to restart the current
    trainer with identical settings instead of rebooting.
 4. Gym config persisted to SRAM; restored on boot.
@@ -160,13 +160,16 @@ whatever else"* (`docs/community-research.md` §3.4).
 **Reordered 2026-08-20** after first community contact. Work follows the revised list in
 `docs/community-research.md` §6.1:
 
-1. **SPS — standardised same piece sequence** (§6.2 #1). *The headline feature.* Force the existing
-   `.predefined` path; fill `wRandomness` from a seeded PRNG. **Resolve the 256-piece wrap question
-   here** (`docs/research.md` §8 #3) — it is reachable within a single 100-line run.
-   **Before designing the seed format:** obtain the unfinished SPS ROM and find out what stalled it
-   (§7 A14). Five years of *"never finished"* implies a real obstacle. Compatibility with any seed
-   format people already share matters more than elegance, and *Muf* has raised automatic seed
-   synchronisation as a goal.
+1. **SPS — standardised same piece sequence** (§6.2 #1). *The headline feature.* Design is now
+   settled by reverse engineering the existing seeded ROM (`docs/existing-hacks.md` §4):
+   **replace the `ldh a,[rDIV]` read in the piece generator with the community's exact 16-bit
+   LFSR**, state in HRAM, result read as a byte. Apply the same substitution to the B-type garbage
+   generator. Everything downstream — the ×4 counting loop, the OR-rejection retry, the biased
+   distribution — stays untouched.
+   **Use their LFSR bit-for-bit, not a better one.** Identical seeds must produce identical
+   sequences across both ROMs, because interoperability *is* the feature for a fairness mechanism.
+   **Guard the degenerate seed:** `$0000` has period 1 and always returns zero.
+   The 256-piece wrap question (`docs/research.md` §8 #3) is moot under this design.
 2. **Match KLM: level starts A–M (10–22) with an extended gravity and scoring table, plus score
    uncap** (§6.2 #2, #4). Non-negotiable — KLM is the de-facto standard and anything less is a
    downgrade. Verify L = 2 frames/row and 26 400 per Tetris against the KLM ROM itself.

@@ -189,6 +189,13 @@ it reads pieces sequentially from **`wRandomness`, a 256-byte table at `$C300`**
 **Seeded sequences, drought injection, scripted drills and VS-parity all reduce to: fill 256 bytes
 and force that branch.** No new generator, no hook in `SpawnNewTetromino`.
 
+> **SUPERSEDED for SPS, 2026-08-20.** Reverse engineering the community's seeded ROM
+> (`docs/existing-hacks.md` §4) showed it hooks the entropy source instead: it replaces the
+> `ldh a, [rDIV]` read with a call to a 16-bit LFSR. **We adopt that approach and that exact LFSR**,
+> because identical seeds must yield identical sequences across both ROMs — for a fairness feature,
+> interoperability beats elegance. The `wRandomness` route stays valid for *drought injection and
+> scripted drills*, where compatibility does not apply and a fully controlled sequence is wanted.
+
 Two caveats to handle explicitly:
 * The table **wraps at 256 pieces**; a 100-line run is roughly 250 pieces, so wrap is reachable.
   Either refill the table on wrap (needs a small hook) or accept repetition and document it.
