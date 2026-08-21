@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.emu import (Tetris, hATypeLevel, hIsHardMode,  # noqa: E402
+from tools.emu import (Tetris, rNR52, hATypeLevel, hIsHardMode,  # noqa: E402
                        GS_IN_GAME_MAIN, GS_TITLE_SCREEN_MAIN)
 
 ROM = "build/tetrisgym.gb"
@@ -60,6 +60,34 @@ def test_restart_from_a_paused_game_is_not_paused():
         y = t[hCurrPieceSquarePixelY]
         t.tick(60)
         assert t[hCurrPieceSquarePixelY] != y, "the piece is frozen at the top"
+
+
+def test_restart_from_a_paused_game_keeps_the_music():
+    """Pausing tells the sound engine to stop the music (wGamePausedActivity=1,
+    $1C34); unpausing tells it to resume ($1C5E). The in-game init never starts
+    the music - it has been playing since the menu - so a restart that skips the
+    unpause leaves it stopped for good."""
+    def channels(pause_first):
+        with Tetris(ROM, sound=True) as t:
+            t.start_game_at(5)
+            t.tick(240)
+            if pause_first:
+                t.press("start")
+                t.tick(60)
+            combo(t)
+            wait_playing(t)
+            t.tick(120)
+            seen = set()
+            for _ in range(180):
+                t.pb.tick()
+                seen.add(t[rNR52] & 0x0F)
+            return seen
+
+    plain, paused = channels(False), channels(True)
+    assert len(paused) > 1, f"no music after restarting a paused game: {sorted(paused)}"
+    assert plain == paused, (
+        f"restarting a paused game sounds different: {sorted(plain)} vs {sorted(paused)}"
+    )
 
 
 def test_restart_is_fast():

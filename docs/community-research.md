@@ -713,8 +713,27 @@ Measured before and after clearing the flag in `GymInGameReset`:
 | before | yes | **1** | frozen |
 | after | yes | 0 | falling |
 
-Three bytes, no new hook, and `tests/test_restart.py` now fumbles the
-combination deliberately.
+Clearing the flag was not enough on its own, and the first attempt at this fix
+left the restarted game **silent** — caught by Giovanni within minutes of
+testing it. Pausing tells the sound engine to stop the music by setting
+`wGamePausedActivity` to 1 (`$1C34`); unpausing tells it to resume by setting 2
+(`$1C5E`), and the engine zeroes it once acted on. **The in-game init never
+starts the music** — it has been playing since the menu — so a restart that
+skips the unpause leaves it stopped for good. The restart now sends the engine
+its own resume signal rather than inventing one.
+
+Measured with sound emulation on, reading `rNR52`'s channel flags:
+
+| | channels seen |
+| --- | --- |
+| restart, no pause | `5, 7, 15` |
+| restart after pause, before | `9` — one constant value, silence |
+| restart after pause, after | `5, 7, 15` — identical to a plain restart |
+
+No new hook, and `tests/test_restart.py` now fumbles the combination
+deliberately and asserts both that the piece falls and that the music plays.
+`tools/emu.py` gained a `sound=` switch for it; without sound emulation every
+channel flag reads zero, which is why nothing caught this.
 
 **Worth recording how this was nearly missed.** The first diagnosis here claimed
 the combination did nothing at all while paused. It was wrong: the "restarted"

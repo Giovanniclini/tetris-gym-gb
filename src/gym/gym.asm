@@ -1422,8 +1422,23 @@ GymInGameReset::
 ; piece sitting at the top until you press Start. Reported by baovofe67, and
 ; diagnosed by Giovanni: it only happens when the combination is fumbled and
 ; Start lands first.
+;
+; Clearing the flag is not enough on its own. Pausing tells the sound engine to
+; stop the music by setting wGamePausedActivity to 1 ($1C34); unpausing tells it
+; to resume by setting 2 ($1C5E), and the engine zeroes it once acted on. The
+; in-game init never starts the music - it has been playing since the menu - so
+; a restart that skips the unpause leaves it stopped for good. Send the engine
+; its own resume signal rather than inventing one.
+	ldh  a, [hGamePaused]
+	and  a
+	jr   z, .wasNotPaused
+
 	xor  a
 	ldh  [hGamePaused], a
+	ld   a, $02
+	ld   [wGamePausedActivity], a
+
+.wasNotPaused:
 
 	ld   a, GS_IN_GAME_INIT
 	ldh  [hGameState], a

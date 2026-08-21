@@ -49,6 +49,7 @@ hStickyButtonCounter = 0xFFAA                # DAS counter
 hGameType = 0xFFC0
 hATypeLevel = 0xFFC2
 hGameState = 0xFFE1
+rNR52 = 0xFF26                               # sound on/off + per-channel flags
 hIsHardMode = 0xFFF4
 
 BOOT_TIMEOUT = 2000     # frames; the copyright screens alone are ~500
@@ -71,11 +72,14 @@ def sym(name, rom="build/tetrisgym.sym"):
 class Tetris:
     """A running Game Boy Tetris, driven a frame at a time."""
 
-    def __init__(self, rom="build/tetris.gb"):
+    def __init__(self, rom="build/tetris.gb", sound=False):
         path = ROOT / rom if not os.path.isabs(rom) else Path(rom)
         if not path.exists():
             raise SystemExit(f"{path} not found - run `python3 build.py` first")
-        self.pb = PyBoy(str(path), window="null", sound_emulated=False, log_level="ERROR")
+        # Sound is off by default: it is slow and most tests do not care. Turn it
+        # on to assert that music is actually playing - rNR52's channel flags are
+        # all zero without it.
+        self.pb = PyBoy(str(path), window="null", sound_emulated=sound, log_level="ERROR")
         # The Gym replaces the title screen, so hearts move from the original's
         # hidden Down+Start there to Select on the level select.
         self.is_gym = "tetrisgym" in path.name
