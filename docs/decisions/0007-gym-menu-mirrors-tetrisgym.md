@@ -89,11 +89,19 @@ puts it.
   original does for every screen change. No VBlank cost.
 * **The line readout must be repainted by hand.** The original only redraws it
   on a line clear, so a drill would otherwise show `000` until the first one.
-* **Everything the Gym paints with the LCD on happens in VBlank.** The hardware
-  drops tilemap writes made while a line is being drawn, and the original's
-  helpers do not guard against it — `DisplayBCDNum2CDigits` writes with a bare
-  `ld [hl+], a` because it is only ever called with the LCD idle. Ignoring that
-  cost us two bugs that looked unrelated: a menu cursor that vanished at random,
-  and a line count that read `0`, `10` or `20` instead of `90`. **PyBoy does not
-  enforce VRAM blocking, so neither showed up in the tests** - only on hardware
-  timing in mGBA.
+* **Every tilemap cell the Gym paints with the LCD on goes through
+  `StoreAinHLwhenLCDFree`.** The hardware drops writes made while a line is being
+  drawn, and the original's helpers do not guard against it —
+  `DisplayBCDNum2CDigits` writes with a bare `ld [hl+], a` because it is only
+  ever called with the LCD idle, so the Gym renders the line count itself rather
+  than calling it.
+
+  This cost three bugs that looked unrelated: a menu cursor that vanished at
+  random, a line count that read `0`, `10` or `20` instead of `90`, and a music
+  letter that never changed. Waiting for VBlank once and then painting is *not*
+  enough — the window is ten lines and the last cells painted fall outside it,
+  which is why the music letter, painted last, was the one that stayed stale.
+
+  **PyBoy does not enforce VRAM blocking, so none of them failed a test.** Only
+  hardware-accurate timing shows them. Treat any "it works in the tests but not
+  on screen" report as this until proven otherwise.

@@ -871,6 +871,16 @@ GymMenuLaunch::
 	ret
 
 
+; A = tile, HL = destination. The hardware drops tilemap writes made while a
+; line is being drawn, so every cell the menu paints goes through here.
+; Preserves BC and DE, which StoreAinHLwhenLCDFree does not.
+GymPutTile::
+	push bc
+	call StoreAinHLwhenLCDFree
+	pop  bc
+	ret
+
+
 GymMenuSound::
 	ld   a, SND_MOVING_SELECTION
 	ld   [wSquareSoundToPlay], a
@@ -921,16 +931,12 @@ GymMenuDraw::
 	ret
 
 
-; Everything that changes: the cursor cells and the row values. Written in
-; VBlank, because with the LCD on the hardware simply drops writes made while a
-; line is being drawn - which is what made the cursor vanish at random.
+; Everything that changes: the cursor cells and the row values. Every write goes
+; through GymPutTile, which waits for the LCD - dropped writes are what made the
+; cursor vanish at random and left the music letter stale.
 GymMenuRepaint::
 	ld   hl, wGymBlinkTimer
 	inc  [hl]
-.waitVBlank:
-	ldh  a, [rLY]
-	cp   SCRN_Y
-	jr   c, .waitVBlank
 
 GymMenuPaint::
 	ld   de, MENU_ROW0
@@ -945,7 +951,7 @@ GymMenuPaint::
 .putCursor:
 	ld   h, d
 	ld   l, e
-	ld   [hl], a
+	call GymPutTile
 
 ; the value, if the row has one
 	ld   a, b
@@ -980,8 +986,7 @@ GymMenuValueCell::
 GymMenuPaintLevel::
 	call GymMenuValueCell
 	ld   a, [wGymDrillLevel]
-	ld   [hl], a
-	ret
+	jp   GymPutTile
 
 
 ; Four hex digits; the tile is the nibble. The digit being edited blinks.
@@ -1010,7 +1015,7 @@ GymMenuPaintSeed::
 	pop  de
 	ld   h, d
 	ld   l, e
-	ld   [hl], a
+	call GymPutTile
 	inc  de
 	inc  c
 	ld   a, c
@@ -1031,8 +1036,7 @@ GymMenuPaintMusic::
 	sub  MUSIC_TYPES_START
 	add  $0a                        ; "A"
 .put:
-	ld   [hl], a
-	ret
+	jp   GymPutTile
 
 
 ; hl = zero-terminated string, de = tilemap destination.
@@ -1134,19 +1138,51 @@ GymDrillApply::
 
 ; Repaint the readout: the original only redraws it on a line clear, so without
 ; this the game shows 000 until the first one.
-;
-; In VBlank. DisplayBCDNum2CDigits writes the tilemap with a bare `ld [hl+], a`,
-; because the original only ever calls it with the LCD idle - do it anywhere
-; else and the hardware drops whichever writes land mid-scanline.
-.waitVBlank:
-	ldh  a, [rLY]
-	cp   SCRN_Y
-	jr   c, .waitVBlank
+	jp   GymDrillPaintLines
 
+
+; The four LINES digits, leading zeros blanked, exactly as the original renders
+; them. Not DisplayBCDNum2CDigits: that writes the tilemap with a bare
+; `ld [hl+], a`, which is correct for the original - it only ever calls it with
+; the LCD idle - and drops writes anywhere else.
+GymDrillPaintLines::
+	ldh  a, [hNumLinesCompletedBCD + 1]
+	ld   d, a
+	ldh  a, [hNumLinesCompletedBCD]
+	ld   e, a
 	ld   hl, _SCRN0 + $14e
-	ld   de, hNumLinesCompletedBCD + 1
-	ld   c, 2
-	jp   DisplayBCDNum2CDigits
+	ld   c, 0                       ; set once a digit has been drawn
+
+	ld   a, d
+	swap a
+	call GymDrillDigit
+	ld   a, d
+	call GymDrillDigit
+	ld   a, e
+	swap a
+	call GymDrillDigit
+	ld   c, 1                       ; the units digit always shows
+	ld   a, e
+	; falls through
+
+GymDrillDigit:
+	and  $0f
+	jr   nz, .visible
+
+	ld   a, c
+	and  a
+	ld   a, TILE_EMPTY              ; nothing drawn yet: a leading zero
+	jr   z, .put
+	ld   a, TILE_0                  ; inside the number: a real zero
+	jr   .put
+
+.visible:
+	ld   c, 1
+
+.put:
+	call GymPutTile
+	inc  hl
+	ret
 
 
 ; Show whether hearts are armed, in the blank strip beside "LEVEL".
