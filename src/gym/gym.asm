@@ -99,13 +99,12 @@ wGymSeedHi:: db
 
 ; Gym menu. wGymMode is the row the cursor sits on, and survives into the game
 ; so trainers can ask which drill is running.
-wGymMenuDrawn::   db        ; the menu paints once per visit, not every frame
 wGymMode::        db        ; MODE_TETRIS / MODE_BTYPE / MODE_TRANSITION
 wGymDrillPending:: db       ; set at game init, consumed on the first game frame
 wGymDrillLevel::  db        ; the level the TRANSITION row is set to
 wGymSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
 
-	ds 1008
+	ds 1009
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -272,6 +271,8 @@ GymDispatch::
 	ld   a, IEF_VBLANK | IEF_SERIAL
 	ldh  [rIE], a
 
+	ld   a, SEED_IDLE
+	ld   [wGymSeedDigit], a
 	call GymMenuDraw
 	ld   a, GS_TITLE_SCREEN_MAIN
 	ldh  [hGameState], a
@@ -755,18 +756,11 @@ NEWCHARMAP gymfont
 SETCHARMAP main
 
 
+; The menu screen is painted by the init state and nowhere else, the way every
+; original screen works. $07 is only ever reached through $06 - including when
+; SerialFunc0_titleScreen bounces a stray serial byte back there - so there is
+; no first-entry case to handle.
 GymMenu::
-	ld   a, [wGymMenuDrawn]
-	and  a
-	jr   nz, .live
-	inc  a
-	ld   [wGymMenuDrawn], a
-	ld   a, SEED_IDLE
-	ld   [wGymSeedDigit], a
-	call GymMenuDraw
-	ret
-
-.live:
 	call GymLinkPing
 	ldh  a, [hGameState]
 	cp   GS_TITLE_SCREEN_MAIN
@@ -802,7 +796,6 @@ GymLinkPing::
 
 GymStart2Player::
 	xor  a
-	ld   [wGymMenuDrawn], a         ; repaint next time we are here
 	ldh  [hTimer1], a
 	ld   a, GS_2PLAYER_GAME_MUSIC_TYPE_INIT
 	ldh  [hGameState], a
@@ -956,8 +949,6 @@ GymMenuInput::
 ; way the original screen did. TRANSITION carries its own level, so it goes
 ; straight into the game - a drill you set up once and repeat.
 GymMenuLaunch::
-	xor  a
-	ld   [wGymMenuDrawn], a         ; repaint next time we are here
 	ld   a, [wGymMode]
 	cp   MODE_2PLAYER
 	jr   z, .keepSerial
