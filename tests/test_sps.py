@@ -17,6 +17,8 @@ sys.path.insert(0, str(ROOT))
 from tools.emu import Tetris, sym, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
 
 ROM = "build/tetrisgym.gb"
+
+hCurrPiece = 0xFF92
 wGymRngLo, wGymRngHi = sym("wGymRngLo"), sym("wGymRngHi")
 wGymSeedLo, wGymSeedHi = sym("wGymSeedLo"), sym("wGymSeedHi")
 GS_IN_GAME_INIT = 0x0A
@@ -200,6 +202,58 @@ def test_the_seed_is_reloaded_at_the_start_of_every_game():
         assert 0xACE1 in seen, (
             f"seed not reloaded on restart; saw {[hex(v) for v in seen]}"
         )
+
+
+def test_the_same_seed_deals_the_same_sequence_after_a_game():
+    """Reloading the LFSR is not enough. The generator draws again when a piece's
+    top six bits match the last one's ($205B), and that test reads
+    hHiddenLoadedPiece, which nothing resets between games. Left over from a
+    previous game it costs an extra draw on the first piece and shifts the whole
+    sequence by one - so the same seed dealt differently depending on what you
+    played before it. Reported by Tolstoj, 2026-08-21."""
+    def seeded_game(play_first):
+        t = Tetris(ROM)
+        t.to_menu()
+        for _ in range(4):
+            t.press("down")                    # SEED
+        t.press("a")
+        for nibble in (0xA, 0xC, 0xE, 0x1):
+            for _ in range(nibble):
+                t.press("up")
+            t.press("right")
+        t.press("a")
+        for _ in range(4):
+            t.press("up")                      # back to TETRIS
+        t.press("start")
+        t.run_until_state(0x11)
+        t.tick(20)
+        t.press("start")
+        t.run_until_state(GS_IN_GAME_MAIN)
+        if play_first:
+            t.tick(1500)                       # dirty the generator's state
+            for b in ("a", "b", "select", "start"):
+                t.pb.button_press(b)
+            t.tick(4)
+            for b in ("a", "b", "select", "start"):
+                t.pb.button_release(b)
+            t.run_until_state(GS_IN_GAME_MAIN)
+        t.tick(4)
+        seen, last = [], None
+        for _ in range(4000):
+            t.pb.tick()
+            cur = t[hCurrPiece]
+            if cur != last:
+                seen.append(cur)
+                last = cur
+                if len(seen) >= 8:
+                    break
+        t.close()
+        return seen
+
+    fresh, after = seeded_game(False), seeded_game(True)
+    assert fresh == after, (
+        f"the same seed dealt differently after a game:\n  {fresh}\n  {after}"
+    )
 
 
 def test_seed_can_be_entered_from_the_menu():
