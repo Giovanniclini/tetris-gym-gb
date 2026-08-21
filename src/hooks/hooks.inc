@@ -71,7 +71,11 @@
 ;                                            boot, and its only lasting effect
 ;                                            is a demo piece table that only the
 ;                                            attract demo reads.
-;   HOOK_STATE_TABLE07 $0309-$030C       4  Jump-table entries for $07, the title
+;   HOOK_STATE_TABLE06 $0307-$030C       6  Jump-table entries for $06 (title
+;                                            init), $07 (title main) and $08.
+;                                            The title screen becomes the Gym
+;                                            menu, drawn by $06 so the original
+;                                            never appears even for a frame. $07 is the
 ;                                            screen, which becomes the Gym menu.
 ;                                            It has to be this state and no
 ;                                            other: SerialFunc0_titleScreen

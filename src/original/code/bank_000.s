@@ -640,7 +640,15 @@ ELSE
 ENDC
 ; --- end deviation #9 ---
 	dw GameState05_BTypeLevelFinished
+; --- tetris-gym-gb deviation #17 (see src/original/UPSTREAM.md) ---
+; The title screen's init, replaced by the Gym menu's, so the original title is
+; never drawn - chaining to it flashes for a frame before the menu paints over.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState06_TitleScreenInit
+ENDC
+; --- end deviation #17 ---
 ; --- tetris-gym-gb deviation #16 (see src/original/UPSTREAM.md) ---
 ; The title screen becomes the Gym menu. It has to be this state and no other:
 ; SerialFunc0_titleScreen ($0078) only assigns a multiplayer role while

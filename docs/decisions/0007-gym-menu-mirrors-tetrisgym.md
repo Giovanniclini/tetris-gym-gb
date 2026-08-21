@@ -123,11 +123,16 @@ link play on this ROM on hardware.** That was equally true before this change.
   banks itself (ADR 0001). Seven bytes in the linker's own empty gap at `$6430`
   solve it. Without this the level select rendered the *title* screen's tiles —
   the same layout, unreadable.
-* **The title screen's init still runs.** Replacing it removes a visible
-  one-frame flash of the original title, and also breaks gameplay: the first
-  piece lands and the game hangs checking completed rows. Something that init
-  does is load-bearing beyond drawing, and it has not been identified yet. The
-  flash stays until it is.
+* **The title screen's init is replaced too**, so the original title never
+  appears — not on boot, not on the way back from a level select.
+
+  What made that hard to get right: **the falling piece collides against
+  `wGameScreenBuffer`, and it is the title init that puts the walls and floor
+  there** — two black columns and a black row at offset `$241`. Replacing the
+  init without them leaves a piece falling past the bottom for ever, sprite
+  never written, no game ever ending. It looks nothing like a drawing bug, and
+  the buffer is not obviously a collision structure. The clears in that init are
+  transcribed for the same reason: assume any of it is cosmetic at your peril.
 * **B on a level select returns to the menu.** It goes to `$08`, which would
   otherwise draw the A-TYPE/B-TYPE screen the menu replaced.
 * **The line readout must be repainted by hand.** The original only redraws it

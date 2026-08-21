@@ -83,6 +83,44 @@ def test_boot_reaches_the_title_without_the_copyright_wait():
         assert frames < 200, f"took {frames} frames ({frames / 59.7:.1f}s) to boot"
 
 
+def test_the_original_title_screen_never_appears():
+    """Not on boot, and not on the way back from a level select. $06 draws the
+    menu itself rather than the title, so there is no frame to catch."""
+    def title_frames(t, limit):
+        n = 0
+        for _ in range(limit):
+            t.pb.tick()
+            row = text(t, 9).replace(" ", "")
+            if "PLAYER" in row:
+                n += 1
+        return n
+
+    with Tetris(ROM) as t:
+        assert title_frames(t, 160) == 0, "the 1P/2P title flashed during boot"
+        t.run_until_state(GS_GAME_TYPE_MAIN)
+        t.tick(20)
+        t.press("start")
+        t.run_until_state(GS_A_TYPE_SELECTION_MAIN)
+        t.tick(20)
+        t.press("b")
+        assert title_frames(t, 90) == 0, "a screen flashed on the way back"
+
+
+def test_gameplay_survives_the_replaced_title_init():
+    """The falling piece collides against wGameScreenBuffer, and it is the
+    title init that puts the walls and floor there. Replacing that init without
+    them makes a piece fall past the bottom for ever."""
+    with Tetris(ROM) as t:
+        t.start_game_at(22)                    # M tops out unaided
+        for frames in range(2000):
+            t.pb.tick()
+            if t.state == 0x04:                # GS_LEVEL_ENDED_MAIN
+                break
+        else:
+            raise AssertionError("no game over: the piece never landed")
+        assert frames < 600, f"took {frames} frames to top out at M"
+
+
 def test_the_level_select_renders_like_the_stock_rom():
     """The menu tileset comes from bank 1, so the Gym has to far-call for it -
     without that the level select drew the title screen's tiles as garbage."""

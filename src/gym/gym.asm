@@ -150,6 +150,8 @@ GymDispatch::
 	jr   z, .init
 	cp   GS_TITLE_SCREEN_MAIN
 	jp   z, .menu
+	cp   GS_TITLE_SCREEN_INIT
+	jp   z, .menuInit
 	cp   GS_GAME_MUSIC_TYPE_INIT
 	jp   z, .backToMenu
 	cp   GS_IN_GAME_MAIN
@@ -218,6 +220,60 @@ GymDispatch::
 ; needed. The tile data comes from $06 either way.
 .skipCopyright:
 	ld   a, GS_TITLE_SCREEN_INIT
+	ldh  [hGameState], a
+	ld   hl, Stub_148c
+	ret
+
+; The title screen's init, replaced so the original title is never drawn. The
+; clears are the original's ($03AE), transcribed; only the screen is ours.
+;
+; The screen buffer clear is not cosmetic. InGameCheckIfAnyTetrisRowsComplete
+; ($213E) scans wGameScreenBuffer for TILE_EMPTY to decide which rows are full -
+; leave it holding anything else and every row reads as complete the moment the
+; first piece lands, which overruns a four-entry list and hangs the game.
+.menuInit:
+	xor  a
+	ldh  [hIsRecordingDemo], a
+	ldh  [hPieceFallingState], a
+	ldh  [hTetrisFlashCount], a
+	ldh  [hPieceCollisionDetected], a
+	ldh  [h1stHighScoreHighestByteForLevel], a
+	ldh  [hNumLinesCompletedBCD + 1], a
+	ldh  [hRowsShiftingDownState], a
+	ldh  [hMustEnterHighScore], a
+	call ClearPointersToCompletedTetrisRows
+	call ClearScoreCategoryVarsAndTotalScore
+
+	ld   hl, wGameScreenBuffer
+.clearScreenBuffer:
+	ld   a, TILE_EMPTY
+	ld   [hl+], a
+	ld   a, h
+	cp   HIGH(wGameScreenBuffer.end)
+	jr   nz, .clearScreenBuffer
+
+; The walls and the floor. Not decoration: the falling piece collides against
+; what is in this buffer, so without them a piece falls past the bottom for
+; ever and no game ever ends.
+	ld   hl, wGameScreenBuffer + 1
+	call DisplayBlackColumnFromHLdown
+	ld   hl, wGameScreenBuffer + $c
+	call DisplayBlackColumnFromHLdown
+
+	ld   hl, wGameScreenBuffer + $241
+	ld   b, $0c
+	ld   a, TILE_BLACK
+.displayBlackRow:
+	ld   [hl+], a
+	dec  b
+	jr   nz, .displayBlackRow
+
+; serial back on: the menu is where a link partner finds us
+	ld   a, IEF_VBLANK | IEF_SERIAL
+	ldh  [rIE], a
+
+	call GymMenuDraw
+	ld   a, GS_TITLE_SCREEN_MAIN
 	ldh  [hGameState], a
 	ld   hl, Stub_148c
 	ret

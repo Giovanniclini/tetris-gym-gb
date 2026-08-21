@@ -24,8 +24,9 @@ ALLOWED_RANGES = [
     (0x02D3, 0x02D5, "HOOK_MAINLOOP_RST - MainLoop reset check routed via the Gym"),
     (0x02FB, 0x02FC, "HOOK_STATE_TABLE_00 - per-frame gameplay state, for trainers"),
     (0x0303, 0x0304, "HOOK_STATE_TABLE_04 - level-ended state routed via the Gym"),
-    (0x0309, 0x030C, "HOOK_STATE_TABLE_07/08 - title screen is the Gym menu, and "
-                     "B from a level select comes back to it"),
+    (0x0307, 0x030C, "HOOK_STATE_TABLE_06/07/08 - the title screen is the Gym menu, "
+                     "drawn by $06 so the original never appears; B from a level "
+                     "select comes back to it"),
     (0x6430, 0x644F, "GYM_BANK1_THUNK - loads the menu tileset, which lives in bank 1"),
     (0x030F, 0x0310, "HOOK_STATE_TABLE_0A - in-game init routed via the Gym"),
     (0x031B, 0x031E, "HOOK_STATE_TABLE - A-type selection states routed via the Gym"),
