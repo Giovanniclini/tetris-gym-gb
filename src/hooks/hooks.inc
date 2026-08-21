@@ -65,6 +65,13 @@
 ;                                            needs it because the original's
 ;                                            in-game init clears the line count
 ;                                            after any earlier hook could set it.
+;   HOOK_STATE_TABLE25 $0345-$0346       2  Jump-table entry for $25, the
+;                                            copyright screen's wait. Skipped
+;                                            straight to the title: $24 has
+;                                            already drawn it and loaded the
+;                                            tile data and demo pieces, so the
+;                                            only thing left was 8.5 seconds of
+;                                            timer on every boot.
 ;   HOOK_STATE_TABLE0E $0317-$0318       2  Jump-table entry for $0E, the
 ;                                            A-TYPE/B-TYPE screen, which becomes
 ;                                            the Gym menu. The only hook that

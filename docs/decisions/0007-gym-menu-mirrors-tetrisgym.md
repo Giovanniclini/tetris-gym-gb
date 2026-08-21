@@ -75,6 +75,26 @@ start level rather than being fixed at 19 — so the number has nothing to mean
 here. The level comes from the level picker instead, where the Game Boy already
 puts it.
 
+## What stays
+
+**The 1 PLAYER / 2 PLAYER screen stays.** Link-cable head-to-head VS is CTWC-GB's
+*bracket format* (`docs/community-research.md` §2) — it is what the scene
+competes at, and a VS garbage trainer is on the roadmap. It is also load-bearing
+for link play itself: `GameState07_TitleScreenMain` pings
+`SB_PASSIVES_PING_IN_TITLE_SCREEN` every frame and auto-starts when a role is
+assigned, so both units have to sit on that screen to find each other. Skipping
+it would break linking in a way that would not be obvious.
+
+Picking 2 PLAYER with no cable attached falls back to 1 PLAYER
+(`.multiplayerInvalid`, `$0509`), which is the original's own behaviour when
+nothing answers the handshake — not a fault of ours.
+
+**The copyright screen goes.** Not the screen: the wait. `$24` draws it and
+loads the tile data and the demo piece table, then `$25` burns `$FA` frames,
+sets another `$FA`, and only then accepts a button — 8.5 s before the title on
+every boot, on a ROM whose selling point is that you restart it constantly.
+Skipping `$25` takes boot to title from 9.8 s to 1.4 s.
+
 ## Consequences
 
 * **A per-frame gameplay hook now exists** (`$00`, `HOOK_STATE_TABLE00`). The

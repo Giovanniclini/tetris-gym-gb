@@ -706,7 +706,16 @@ ENDC
 	dw GameState22_DancersInit
 	dw GameState23_DancersMain
 	dw GameState24_CopyrightDisplay
+; --- tetris-gym-gb deviation #15 (see src/original/UPSTREAM.md) ---
+; The copyright screen's eight-and-a-half second wait, skipped. $24 still runs,
+; so the tile data and the demo piece table are still loaded; only the timer is
+; cut. A trainer is restarted constantly and that wait is the whole boot.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState25_CopyrightWaiting
+ENDC
+; --- end deviation #15 ---
 	dw GameState26_ShuttleSceneInit
 	dw GameState27_ShuttleSceneShowClouds
 	dw GameState28_ShuttleSceneFlashCloudsGetBigger

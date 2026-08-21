@@ -152,6 +152,8 @@ GymDispatch::
 	jr   z, .menu
 	cp   GS_IN_GAME_MAIN
 	jr   z, .inGameMain
+	cp   GS_COPYRIGHT_WAITING
+	jr   z, .skipCopyright
 
 ; The original main handler only calls bank-0 routines, so we can run it
 ; ourselves and then correct what it did. Fixing up afterwards is the only way
@@ -205,6 +207,16 @@ GymDispatch::
 	call GymArmSeed
 	call GymArmDrill
 	ld   hl, GameState0a_InGameInit
+	ret
+
+; The copyright screen waits $FA frames, sets another $FA, and only then lets a
+; button through: eight and a half seconds before the title on every boot. State
+; $24 has already drawn it and loaded the tile data and demo pieces, so there is
+; nothing left to wait for.
+.skipCopyright:
+	ld   a, GS_TITLE_SCREEN_INIT
+	ldh  [hGameState], a
+	ld   hl, Stub_148c
 	ret
 
 ; The Gym menu, on the screen that used to offer A-TYPE and B-TYPE. The original

@@ -72,6 +72,19 @@ def to_menu_row(t, row):
     return t
 
 
+def test_boot_reaches_the_title_without_the_copyright_wait():
+    """The copyright screen used to hold the boot for 8.5 seconds. $24 still
+    runs - the tile data and demo pieces come from it - only the timer is cut."""
+    with Tetris(ROM) as t:
+        for frames in range(400):
+            t.pb.tick()
+            if t.state == 0x07:                # GS_TITLE_SCREEN_MAIN
+                break
+        else:
+            raise AssertionError("never reached the title screen")
+        assert frames < 200, f"took {frames} frames ({frames / 59.7:.1f}s) to boot"
+
+
 def test_the_menu_replaces_the_game_type_screen():
     with Tetris(ROM) as t:
         to_menu(t)
