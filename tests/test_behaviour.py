@@ -93,6 +93,61 @@ def test_gym_build_preserves_every_original_level():
             t.__init__("build/tetrisgym.gb")
 
 
+PIECE_Y = 0xC201                             # wSpriteSpecs[0].BaseYOffset
+wScoreBCD = 0xC0A0
+
+
+def _fall(level, tap_down, frames=900):
+    """Most common gap between one-row drops, and the score at the end.
+
+    Down has to be re-pressed for each new piece (wCanPressDownToMakePieceFall),
+    so a single hold does nothing after the first one.
+    """
+    import collections
+    with Tetris("build/tetrisgym.gb") as t:
+        t.start_game_at(level)
+        t.tick(60)
+        marks, prev = [], t[PIECE_Y]
+        for f in range(frames):
+            if tap_down:
+                if f % 8 == 0:
+                    t.pb.button_press("down")
+                elif f % 8 == 4:
+                    t.pb.button_release("down")
+            t.pb.tick()
+            cur = t[PIECE_Y]
+            if cur == prev + 8:
+                marks.append(f)
+            prev = cur
+        score = int(f"{t[wScoreBCD+2]:02X}{t[wScoreBCD+1]:02X}{t[wScoreBCD]:02X}")
+        gaps = [b - a for a, b in zip(marks, marks[1:])]
+        return collections.Counter(gaps).most_common(1)[0][0], score
+
+
+def test_pushdown_still_works_below_l():
+    """Pushdown moves the piece every 3 frames, so it is a speed-up everywhere
+    the original can reach, and it earns a point per row."""
+    free, _ = _fall(9, False)
+    pushed, score = _fall(9, True)
+    assert pushed < free, f"pushdown did nothing at level 9: {free} -> {pushed}"
+    assert score > 0, "no drop points at level 9"
+
+
+def test_pushdown_does_nothing_at_l_and_m():
+    """L and M fall in 2 and 1 frames, so the 3-frame pushdown timer would make
+    them *slower* - it hitches instead of accelerating. Tolstoj: "make sure L and
+    M do not change their gravity". The drop points go with it: no push, nothing
+    to reward."""
+    for level, expected in ((21, 2), (22, 1)):
+        free, _ = _fall(level, False)
+        pushed, score = _fall(level, True)
+        assert free == expected, f"level {level} should free-fall in {expected}, got {free}"
+        assert pushed == free, (
+            f"level {level}: Down changed the fall rate, {free} -> {pushed}"
+        )
+        assert score == 0, f"level {level} still awarded {score} drop points"
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":
