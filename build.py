@@ -65,16 +65,40 @@ def run(cmd):
         print(proc.stderr.rstrip(), file=sys.stderr)
 
 
+# Reserved by the cartridge header, filled by rgbfix after linking. The linker
+# reports them as empty because no section claims them; writing there bricks the
+# ROM (the boot ROM refuses to run if the logo does not match).
+ROM0_RESERVED = ((0x0104, 0x0133, "Nintendo logo"),
+                 (0x014D, 0x014F, "header checksums"))
+
+
 def freespace(map_path: Path) -> None:
+    """Per-bank free space, counting only bytes that could actually be used."""
     print("\nfree space:")
-    bank = None
+    bank, free, reserved = None, 0, 0
+
+    def flush():
+        if bank is None:
+            return
+        note = f"   ({reserved} reserved for the header)" if reserved else ""
+        print(f"  {bank:<16} {free} bytes{note}")
+
     for line in map_path.read_text().splitlines():
         stripped = line.strip()
-        if stripped.endswith("bank #0:") or "bank #" in stripped and ":" in stripped:
-            if not stripped.startswith(("SECTION", "EMPTY", "TOTAL")):
-                bank = stripped.rstrip(":")
-        elif stripped.startswith("TOTAL EMPTY:") and bank:
-            print(f"  {bank:<16} {stripped.split(':', 1)[1].strip()}")
+        if "bank #" in stripped and stripped.endswith(":") \
+                and not stripped.startswith(("SECTION", "EMPTY", "TOTAL")):
+            flush()
+            bank, free, reserved = stripped.rstrip(":"), 0, 0
+        elif stripped.startswith("EMPTY:") and bank:
+            span = stripped.split("$", 1)[1].split(" ")[0]
+            lo, hi = (int(x, 16) for x in span.split("-$"))
+            size = hi - lo + 1
+            if bank.startswith("ROM0") and any(lo >= a and hi <= b
+                                               for a, b, _ in ROM0_RESERVED):
+                reserved += size
+            else:
+                free += size
+    flush()
 
 
 def build_rom(gym: int, no_sram: bool = False):
