@@ -117,6 +117,19 @@ link play on this ROM on hardware.** That was equally true before this change.
   ROM, unreferenced.
 * **The menu repaints on entry, not per frame**, with the LCD off, as the
   original does for every screen change. No VBlank cost.
+* **The menu loads its tileset through a bank-1 thunk.**
+  `LoadAsciiAndMenuScreenGfx` is in bank 0 but reads `Gfx_Ascii` from bank 1, so
+  it cannot be called while bank 2 is mapped, and bank-2 code must not switch
+  banks itself (ADR 0001). Seven bytes in the linker's own empty gap at `$6430`
+  solve it. Without this the level select rendered the *title* screen's tiles —
+  the same layout, unreadable.
+* **The title screen's init still runs.** Replacing it removes a visible
+  one-frame flash of the original title, and also breaks gameplay: the first
+  piece lands and the game hangs checking completed rows. Something that init
+  does is load-bearing beyond drawing, and it has not been identified yet. The
+  flash stays until it is.
+* **B on a level select returns to the menu.** It goes to `$08`, which would
+  otherwise draw the A-TYPE/B-TYPE screen the menu replaced.
 * **The line readout must be repainted by hand.** The original only redraws it
   on a line clear, so a drill would otherwise show `000` until the first one.
 * **Every tilemap cell the Gym paints with the LCD on goes through

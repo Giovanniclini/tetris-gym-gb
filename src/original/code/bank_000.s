@@ -652,7 +652,15 @@ ELSE
 	dw GameState07_TitleScreenMain
 ENDC
 ; --- end deviation #16 ---
+; --- tetris-gym-gb deviation #18 (see src/original/UPSTREAM.md) ---
+; B on a level select goes here, which would load the A-TYPE/B-TYPE screen the
+; Gym menu replaced. Sent back to the menu instead.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState08_GameMusicTypeInit
+ENDC
+; --- end deviation #18 ---
 	dw Stub_148c
 ; --- tetris-gym-gb deviation #12 (see src/original/UPSTREAM.md) ---
 ; Routed through the Gym so the configured seed is loaded into the LFSR every

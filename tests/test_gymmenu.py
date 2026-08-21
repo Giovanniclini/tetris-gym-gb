@@ -83,6 +83,29 @@ def test_boot_reaches_the_title_without_the_copyright_wait():
         assert frames < 200, f"took {frames} frames ({frames / 59.7:.1f}s) to boot"
 
 
+def test_the_level_select_renders_like_the_stock_rom():
+    """The menu tileset comes from bank 1, so the Gym has to far-call for it -
+    without that the level select drew the title screen's tiles as garbage."""
+    with Tetris(ROM) as gym, Tetris("build/tetris.gb") as stock:
+        gym.to_level_select(); gym.tick(30)
+        stock.to_level_select(); stock.tick(30)
+        differing = [(r, c) for r in range(18) for c in range(20)
+                     if gym[0x9800 + r * 32 + c] != stock[0x9800 + r * 32 + c]]
+        assert len(differing) <= 1, (
+            f"{len(differing)} cells differ from the stock level select: {differing[:8]}"
+        )
+
+
+def test_b_from_the_level_select_returns_to_the_menu():
+    """B goes to $08, which would draw the A-TYPE/B-TYPE screen the menu
+    replaced."""
+    with Tetris(ROM) as t:
+        t.to_level_select()
+        t.press("b")
+        t.tick(60)
+        assert t.state == GS_GAME_TYPE_MAIN, f"landed on state ${t.state:02X}"
+
+
 def test_the_menu_replaces_the_game_type_screen():
     with Tetris(ROM) as t:
         to_menu(t)

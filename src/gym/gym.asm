@@ -149,9 +149,11 @@ GymDispatch::
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
 	cp   GS_TITLE_SCREEN_MAIN
-	jr   z, .menu
+	jp   z, .menu
+	cp   GS_GAME_MUSIC_TYPE_INIT
+	jp   z, .backToMenu
 	cp   GS_IN_GAME_MAIN
-	jr   z, .inGameMain
+	jp   z, .inGameMain
 	cp   GS_COPYRIGHT_DISPLAY
 	jr   z, .skipCopyright
 
@@ -215,6 +217,14 @@ GymDispatch::
 ; table into it at $068C. The Gym menu never runs a demo, so none of it is
 ; needed. The tile data comes from $06 either way.
 .skipCopyright:
+	ld   a, GS_TITLE_SCREEN_INIT
+	ldh  [hGameState], a
+	ld   hl, Stub_148c
+	ret
+
+; B on a level select goes to $08, which would load the A-TYPE/B-TYPE screen.
+; Send it back to the Gym menu instead - that is where it came from.
+.backToMenu:
 	ld   a, GS_TITLE_SCREEN_INIT
 	ldh  [hGameState], a
 	ld   hl, Stub_148c
@@ -892,6 +902,19 @@ GymMenuInput::
 GymMenuLaunch::
 	xor  a
 	ld   [wGymMenuDrawn], a         ; repaint next time we are here
+	ld   a, [wGymMode]
+	cp   MODE_2PLAYER
+	jr   z, .keepSerial
+; What $08 did on the way into a one-player game ($1444): serial off, and the
+; serial registers and any pending interrupt cleared. Leaving rIF holding a
+; stale serial flag is what froze the first piece.
+	ld   a, IEF_VBLANK
+	ldh  [rIE], a
+	xor  a
+	ldh  [rSB], a
+	ldh  [rSC], a
+	ldh  [rIF], a
+.keepSerial:
 	ld   a, SND_CONFIRM_OR_LETTER_TYPED
 	ld   [wSquareSoundToPlay], a
 
@@ -969,7 +992,9 @@ GymMenuSound::
 
 ; The one-off paint, with the LCD off - the labels never change afterwards.
 GymMenuDraw::
-	call TurnOffLCD
+	ld   b, BANK(GymLoadMenuGfx)
+	ld   hl, GymLoadMenuGfx
+	call FarCall                    ; LCD off, then the menu tileset
 	call Clear_wOam
 
 	ld   hl, _SCRN0

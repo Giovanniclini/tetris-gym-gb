@@ -71,7 +71,7 @@
 ;                                            boot, and its only lasting effect
 ;                                            is a demo piece table that only the
 ;                                            attract demo reads.
-;   HOOK_STATE_TABLE07 $0309-$030A       2  Jump-table entry for $07, the title
+;   HOOK_STATE_TABLE07 $0309-$030C       4  Jump-table entries for $07, the title
 ;                                            screen, which becomes the Gym menu.
 ;                                            It has to be this state and no
 ;                                            other: SerialFunc0_titleScreen
@@ -80,7 +80,19 @@
 ;                                            bounces the game back to the title
 ;                                            from anywhere else. The only hook
 ;                                            that replaces an original handler
-;                                            rather than chaining to it.
+;                                            rather than chaining to it - and
+;                                            for $08, which B on a level select
+;                                            reaches, sent back to the menu so
+;                                            the A-TYPE/B-TYPE screen the menu
+;                                            replaced is never drawn.
+;   GYM_BANK1_THUNK   $6430-$644F        32  LoadAsciiAndMenuScreenGfx is in
+;                                            bank 0 but reads Gfx_Ascii from
+;                                            bank 1, so it cannot be called
+;                                            while bank 2 is mapped. This thunk
+;                                            is what the menu far-calls to load
+;                                            its tileset. A new section in the
+;                                            linker's own empty gap, not an
+;                                            insertion.
 ;
 ; Nothing else in banks 0-1 may change.
 ;
