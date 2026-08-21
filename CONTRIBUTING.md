@@ -79,6 +79,13 @@ python3 -m venv .venv
 .venv/bin/python tests/test_link.py
 ```
 
+The README's screenshots come from the ROM, not from a folder of stale
+captures. Regenerate them after a UI change:
+
+```
+.venv/bin/python tools/screenshots.py
+```
+
 The whole suite takes about 15 seconds.
 
 ## Before you write code

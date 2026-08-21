@@ -3,7 +3,7 @@
 **A TetrisGYM-style training and practice ROM for the original Nintendo Game Boy Tetris (1989).**
 
 > **Status:** see [`docs/roadmap.md`](docs/roadmap.md).
-> Working today: level select up to M, hearts, instant restart, SPS and per-level high scores.
+> Working today: the Gym menu, level select up to M, hearts, the transition trainer, SPS and instant restart.
 > [**Get v0.1.0**](https://github.com/Giovanniclini/tetris-gym-gb/releases) — or see
 > [Play it](#play-it).
 
@@ -78,48 +78,96 @@ Game Boy Color*** or the screen is greyscale — see [below](#known-quirk-greysc
 
 ### Controls
 
-Everything the original does still works. What the Gym adds:
-
 | Where | Press | Does |
 | --- | --- | --- |
 | Gym menu | `Up` / `Down` | move between rows |
 | Gym menu | `Left` / `Right` | change the value on the row |
 | Gym menu | `Start` or `A` | launch the mode |
-| Gym menu, `SEED` | `A` | open the digits, and close them again |
-| `SEED` digits | `Left` / `Right` | pick a digit · `Up` / `Down` change it |
 | Level select, grid cell `9` | `Right` | into the level picker |
-| Level picker | `Up` / `Down` | choose `0`–`9` then `A`–`M` (`A` = 10, `M` = 22) |
-| Level picker | `Left` | back to the grid |
-| Level select | `Select` | toggle hearts (+10 speed), shown beside `LEVEL` |
-| Any time in a game | `A`+`B`+`Select`+`Start` | restart the same drill instantly |
+| Level picker | `Up` / `Down` | choose `0`–`9` then `A`–`M` |
+| Level select | `Select` | toggle hearts |
+| Any time in a game | `A`+`B`+`Select`+`Start` | restart the same drill |
 
-A seed of `0000` means **no seed** — pieces come from the hardware timer, exactly as the
-original does. Any other seed gives the same pieces every time, and the same pieces as the
-community's existing seeded ROM, so seeds are shareable.
+## Trainers
 
-Hearts are unavailable above level 20: the original computes heart speed as
-`min(level + 10, 20)`, which past 20 clamps *downward* and would make the game slower.
+![The Gym menu](./assets/screens/menu.png)
 
-## What it does
+The A-TYPE/B-TYPE screen is the Gym menu, modelled on
+[TetrisGYM's](https://github.com/kirjavascript/TetrisGYM): one list, playable modes first,
+settings after, each row carrying its own value. `Up`/`Down` move, `Left`/`Right` change the
+value on the row, `Start` launches.
 
-**Working today**
+Boot lands here in about a second — the copyright screen is skipped.
 
-| | |
-| --- | --- |
-| **Level select to M** | Levels `0-9` and `A-M` from a picker beside the original grid — `Right` off cell 9 to reach it, `Up`/`Down` to choose. `M` is one row per frame, the engine's ceiling |
-| **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
-| **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
-| **SPS** | Four hex digits on the menu's `SEED` row. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
-| **Straight to the menu** | Copyright and title screens gone — boot lands on the Gym menu in 1.3 s instead of 9.8 s |
-| **Gym menu** | TetrisGYM's list — `TETRIS`, `B-TYPE`, `2 PLAYER`, `TRANSITION`, then the `SEED` and `MUSIC` settings |
-| **Transition trainer** | Picks its own level and starts straight away. A level 9 start transitions at 100 lines; the drill begins at 90 |
-| **High scores per level** | `A-M` get their own slots, so the `TOP SCORE` panel tracks the level you are about to play |
+### Tetris
 
-**Next**
+![Level select](./assets/screens/level-select.png)
 
-Transition trainer, Hz counter, floor and preset boards, low stack,
-VS garbage. Ranked from community evidence in
-[`docs/community-research.md`](docs/community-research.md) §6.2.
+A-Type, with the original grid untouched and a picker beside it: `Right` off cell `9` to reach
+it, then `Up`/`Down` for `0`–`9` and `A`–`M`. `M` is one row per frame, the engine's ceiling.
+
+`Select` toggles **hearts** — the original's hidden `Down`+`Start`, made visible, with an
+indicator beside `LEVEL`. They add ten levels of speed, and are withheld above level 20 because
+the original computes them as `min(level + 10, 20)`, which past 20 clamps *downward* and would
+make the game slower.
+
+The `TOP SCORE` panel follows the level you are about to play. `A`–`M` have their own slots.
+
+### Transition
+
+![Transition on the menu](./assets/screens/transition-menu.png)
+![Transition in play](./assets/screens/transition.png)
+
+Start ten lines short of your level's speed change, so you can drill the part that matters
+instead of the hundred lines in front of it.
+
+Game Boy's transition is the level-up threshold, and the original treats your starting level as
+the number of tens to clear — so a level 9 start levels up at 100 lines and the drill begins at
+90. The row carries its own level and starts the game directly; instant restart then repeats
+the same drill.
+
+Modelled on TetrisGYM's `TRANSITION`, minus its score preset: that exists for NES's pace
+readout, which the Game Boy does not have.
+
+### Seed
+
+![Seed entry](./assets/screens/seed.png)
+
+Same seed, same pieces — **and the same pieces as the community's existing seeded ROM**, because
+this uses that LFSR bit for bit rather than a better one. Interoperability is the whole point of
+a fairness mechanism.
+
+`A` opens the four digits, `Left`/`Right` pick one, `Up`/`Down` change it, `A` closes them. The
+seed applies to every mode, including B-Type's starting garbage, and is reloaded at the start of
+every game so a restart repeats a sequence rather than continuing it.
+
+`0000` means **no seed**: pieces come from the hardware timer, exactly as the original does.
+
+### B-Type
+
+The original B-Type, reached from the menu. Its level and height selection are untouched.
+
+### 2 Player
+
+Link-cable head-to-head, the format CTWC-GB runs its brackets on. The menu keeps pinging for a
+partner every frame, the way the title screen it replaced did, and hands over the moment one
+answers.
+
+**Untested on hardware.** Nobody involved has a link cable and no emulator here can carry one, so
+what is verified is that the bytes on the wire are the original's, that the ping never stops, and
+that the fallbacks behave. See [`docs/decisions/0007`](docs/decisions/0007-gym-menu-mirrors-tetrisgym.md).
+
+### Instant restart
+
+`A`+`B`+`Select`+`Start` restarts the current drill in about 0.15 s, instead of rebooting through
+fifteen seconds of logos and menus. It works during a game, on the game-over screen, and while
+typing a high score name — abandoning the score is the point when you are drilling.
+
+You get the level you *chose*, not the level you reached.
+
+---
+
+*Screenshots are regenerated from the ROM by `.venv/bin/python tools/screenshots.py`.*
 
 ## Technical approach
 

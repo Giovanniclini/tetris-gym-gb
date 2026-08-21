@@ -1211,7 +1211,7 @@ GymMenuPutString::
 PUSHC
 SETCHARMAP gymfont
 GymMenuTitle::
-	db "TETRIS GYM", 0
+	db "TETRIS GYM GB", 0
 
 ; One zero-terminated label per row, in wGymMode order.
 GymMenuLabels::
