@@ -83,6 +83,42 @@ def test_boot_reaches_the_title_without_the_copyright_wait():
         assert frames < 200, f"took {frames} frames ({frames / 59.7:.1f}s) to boot"
 
 
+# The parts of GameState06_TitleScreenInit ($03AE) the Gym menu's init has to do
+# itself, and where they are in the stock ROM. Everything else that init does is
+# drawing the title, which the menu replaces.
+TRANSCRIBED_FROM_06 = [
+    ("the HRAM clears", 0x03B1, 0x03C7),
+    ("the screen buffer clear", 0x03CB, 0x03D5),
+    ("the walls and the floor", 0x03D6, 0x03EC),
+]
+
+
+def test_the_title_init_is_transcribed_not_rewritten():
+    """The menu's init replaces the title screen's, so it has to redo the parts
+    of it that are not about drawing - and get them exactly right.
+
+    The floor is the one that bites: the falling piece collides against
+    wGameScreenBuffer, so without it a piece falls past the bottom for ever and
+    the game hangs somewhere else entirely. Asserting the bytes rather than the
+    behaviour is what stops that drifting again."""
+    stock = (ROOT / "build/tetris.gb").read_bytes()
+    gym = (ROOT / ROM).read_bytes()
+
+    where = []
+    for name, lo, hi in TRANSCRIBED_FROM_06:
+        seq = stock[lo:hi + 1]
+        at = gym.find(seq, 0x8000)
+        assert at >= 0, f"{name} (${lo:04X}-${hi:04X}) is not in the Gym banks verbatim"
+        where.append((name, at, len(seq)))
+
+    # ... and in order, with nothing spliced between them.
+    for (name, at, size), (next_name, next_at, _) in zip(where, where[1:]):
+        assert at + size == next_at, (
+            f"{next_name} does not directly follow {name} "
+            f"(${at + size:04X} vs ${next_at:04X})"
+        )
+
+
 def test_the_original_title_screen_never_appears():
     """Not on boot, and not on the way back from a level select. $06 draws the
     menu itself rather than the title, so there is no frame to catch."""

@@ -12,3 +12,4 @@ choice would otherwise have to be re-derived — or, worse, silently reversed.
 | [5](0005-instant-restart.md) | Instant restart hooks three places, not one |
 | [6](0006-high-scores-for-levels-a-to-m.md) | High scores for A–M continue the original's table |
 | [7](0007-gym-menu-mirrors-tetrisgym.md) | The Gym menu is TetrisGYM's list, on the screen the game already had |
+| [8](0008-retire-the-hook-count-budget.md) | The hook count is not the budget; the diff test is |

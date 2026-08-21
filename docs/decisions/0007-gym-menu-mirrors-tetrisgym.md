@@ -133,6 +133,11 @@ link play on this ROM on hardware.** That was equally true before this change.
   never written, no game ever ending. It looks nothing like a drawing bug, and
   the buffer is not obviously a collision structure. The clears in that init are
   transcribed for the same reason: assume any of it is cosmetic at your peril.
+
+  `tests/test_gymmenu.py` asserts those three runs appear **byte for byte** in
+  the Gym's banks, in order and adjacent — the same treatment the serial ping
+  gets. Deleting the floor again fails that test by name, rather than by hanging
+  a game somewhere unrelated.
 * **B on a level select returns to the menu.** It goes to `$08`, which would
   otherwise draw the A-TYPE/B-TYPE screen the menu replaced.
 * **The line readout must be repainted by hand.** The original only redraws it
