@@ -687,19 +687,29 @@ ROM will expect the menu. **This is the first evidence that our instant restart
 is surprising to someone who knows TetrisGYM**, and it is worth solving as *two*
 gestures rather than by changing what the existing one does.
 
-### 8.2 Unreproduced bug report: the next-piece box
+### 8.2 Bug: the reset combination does nothing while paused
 
 > *"i notice that if you restart, the next box will turn off"* — báovofe67 [TAWS]
 
-**Could not reproduce.** The preview is four sprites at OAM 8–11; it stayed
-present and correctly positioned across every restart path, sampled every ten
-frames for two hundred frames after:
+The report as written does not reproduce: the next-piece preview is four sprites
+at OAM 8–11, and it stayed present and correctly placed across restarts during
+play, from the game-over screen and inside a transition drill, sampled every ten
+frames for two hundred frames after.
 
-| Restart from | Preview sprites |
+**What does reproduce is next to it.** Giovanni's reading — that the player is
+fumbling the combination and pressing Start first — leads straight to a real
+bug:
+
+| | |
 | --- | --- |
-| during play | 4 throughout |
-| the game-over screen | 4 throughout |
-| inside a transition drill | 4 throughout |
+| `A+B+Select+Start` while playing | restarts, as designed |
+| Start pressed first, then the combination | **nothing happens; the game stays paused** |
 
-Worth asking which version — the report may predate v0.2.0, which changed the
-whole boot and menu path. Not closed; just not seen.
+Start alone pauses. Pausing switches the background map from `$9800` to `$9C00`
+— the PAUSE screen, where the playfield is replaced by text, which is the
+original's own anti-cheat behaviour and is very likely the "box" that appeared
+to turn off. From there the combination is swallowed and the drill never
+restarts, so instant restart looks broken to the person using it.
+
+**This is worth fixing:** the combination should restart from a paused game too.
+It sits in `InGameCheckResetAndPause`, the same routine ADR 0005 already hooks.
