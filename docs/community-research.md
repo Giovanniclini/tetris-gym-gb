@@ -656,3 +656,50 @@ opinion data lives where I could not reach it.
 * [tetrisconcept.net — GB Tetris 999999](https://tetrisconcept.net/threads/game-boy-tetris-score-of-999999-points-and-9999-lines.1402/)
 * [Guinness — Highest score on Tetris for Game Boy](https://www.guinnessworldrecords.com/world-records/385225-highest-score-on-tetris-for-game-boy)
 * [Classic Tetris World Championship](https://thectwc.com/) · [Classic Tetris Monthly server list](https://ctm.gg/servers/)
+
+---
+
+## 8. Requests after the v0.2.0 release (GBTetris Discord, 2026-08-21)
+
+First contact with players actually holding the ROM, rather than describing what
+they would want. Recorded as evidence, not as a plan — §6.2's ranking still
+governs order.
+
+| Asked for | By | Notes |
+| --- | --- | --- |
+| **Crunch trainer** | báovofe67 [TAWS] — and a second person earlier the same day | **Two independent requests, unprompted, and the only feature named twice.** Costed in `docs/existing-hacks.md`: no new hooks needed |
+| **A way out of a drill** back to the level select | báovofe67 [TAWS] | See below — this is a naming collision, not a missing feature |
+| **(Quick)tap trainer and tap-quantity trainer** | toni | Both exist in TetrisGYM. GB's DAS is 23+9, not 16+6, so the thresholds do not port |
+| **Six-digit seeds** | Hepta [PADX] | **Second independent voice after Tolstoj**, who asked for the same thing by DM the same morning. Ours is 16-bit, chosen for compatibility with the seeded ROM in circulation |
+
+### 8.1 `A+B+Select+Start` means something different here
+
+> *"also can you made smt to get out of the game … like a+b+select+start in
+> tetrisgym"* — báovofe67 [TAWS]
+
+In TetrisGYM that combination returns you to the **menu**. Here it restarts the
+current drill in place (ADR 0005), which was a deliberate choice — *"when you are
+drilling you want another go"* — and is the behaviour the Game Boy's own soft
+reset already had.
+
+Both are useful and they are not the same thing. A player arriving from the NES
+ROM will expect the menu. **This is the first evidence that our instant restart
+is surprising to someone who knows TetrisGYM**, and it is worth solving as *two*
+gestures rather than by changing what the existing one does.
+
+### 8.2 Unreproduced bug report: the next-piece box
+
+> *"i notice that if you restart, the next box will turn off"* — báovofe67 [TAWS]
+
+**Could not reproduce.** The preview is four sprites at OAM 8–11; it stayed
+present and correctly positioned across every restart path, sampled every ten
+frames for two hundred frames after:
+
+| Restart from | Preview sprites |
+| --- | --- |
+| during play | 4 throughout |
+| the game-over screen | 4 throughout |
+| inside a transition drill | 4 throughout |
+
+Worth asking which version — the report may predate v0.2.0, which changed the
+whole boot and menu path. Not closed; just not seen.
