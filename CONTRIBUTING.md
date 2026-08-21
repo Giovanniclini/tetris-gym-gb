@@ -75,6 +75,7 @@ python3 -m venv .venv
 .venv/bin/python tests/test_menu.py
 .venv/bin/python tests/test_restart.py
 .venv/bin/python tests/test_sps.py
+.venv/bin/python tests/test_gymmenu.py
 ```
 
 The whole suite takes about 15 seconds.

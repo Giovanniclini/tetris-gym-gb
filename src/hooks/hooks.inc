@@ -58,6 +58,18 @@
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.
+;   HOOK_STATE_TABLE00 $02FB-$02FC       2  Jump-table entry for $00, the
+;                                            per-frame gameplay state. The one
+;                                            hook trainers act from while a game
+;                                            is running - the transition trainer
+;                                            needs it because the original's
+;                                            in-game init clears the line count
+;                                            after any earlier hook could set it.
+;   HOOK_STATE_TABLE0E $0317-$0318       2  Jump-table entry for $0E, the
+;                                            A-TYPE/B-TYPE screen, which becomes
+;                                            the Gym menu. The only hook that
+;                                            replaces an original handler rather
+;                                            than chaining to it.
 ;
 ; Nothing else in banks 0-1 may change.
 ;

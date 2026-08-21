@@ -196,6 +196,10 @@ come from `rDIV` as they always did.
 **Status 2026-08-21:** levels A–M have their own high-score slots, so a score is
 filed and shown under the level it was played at (`docs/decisions/0006`).
 
+**Status 2026-08-21:** the A-TYPE/B-TYPE screen is now the Gym menu, modelled on
+TetrisGYM's list, and carries the first trainer — TRANSITION
+(`docs/decisions/0007`).
+
 Work follows the revised list in `docs/community-research.md` §6.2:
 
 1. **SPS — standardised same piece sequence** (§6.2 #1). *The headline feature.* Design is now
@@ -234,7 +238,7 @@ Work follows the revised list in `docs/community-research.md` §6.2:
 - [ ] **SPS: the same seed produces a byte-identical piece sequence across two runs**, asserted in tests
 - [ ] **Level starts A–M match the KLM ROM's speed and scoring exactly**, verified against KLM itself
 - [ ] Sprint timer agrees with the existing qual ROM to the frame on the same inputs
-- [ ] Transition trainer drops the player at a chosen line count with correct level, gravity and score state
+- [x] Transition trainer drops the player at a chosen line count with correct level, gravity and score state
 - [ ] 40-line sprint: timer starts on first piece, stops on the 40th line, accurate to ±0 frames
       (verified against an emulator frame count, not a wall clock)
 - [ ] Seeded sequences match the original's 2-player behaviour (same-pieces parity)

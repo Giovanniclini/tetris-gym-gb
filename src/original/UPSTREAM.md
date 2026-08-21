@@ -52,3 +52,5 @@ listed in the table below with a justification (see `docs/architecture.md` §3.1
 Upstream's `web/` visualiser, `tools/`, `coverage.txt` and `README.md` are not
 needed to build and were left out. Fetch them from upstream if useful — the
 visualiser in particular is a handy reference for screen layouts and sprites.
+| 13 | `code/bank_000.s` | `IF GYM` routes the `$00` jump-table entry (in-game main) through `GymStateHook` | 3 (hook) | The one per-frame gameplay hook. Trainers that must act while a game runs all land here rather than adding a hook each; the transition trainer needs it because the original's in-game init clears the line count after any earlier hook could set it. | 2. Zero when `GYM=0`. |
+| 14 | `code/bank_000.s` | `IF GYM` routes the `$0E` jump-table entry (A-TYPE/B-TYPE screen) through `GymStateHook` | 3 (hook) | That screen becomes the Gym menu. The only hook that *replaces* an original handler rather than chaining to it - the Gym redraws the screen and handles its own input. See `docs/decisions/0007`. | 2. Zero when `GYM=0`. |

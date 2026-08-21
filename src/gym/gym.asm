@@ -97,7 +97,13 @@ wGymRngHi:: db
 wGymSeedLo:: db
 wGymSeedHi:: db
 
-	ds 1013
+; Gym menu. wGymMode is the row the cursor sits on, and survives into the game
+; so trainers can ask which drill is running.
+wGymMenuDrawn::   db        ; the menu paints once per visit, not every frame
+wGymMode::        db        ; MODE_TETRIS / MODE_BTYPE / MODE_TRANSITION
+wGymDrillPending:: db       ; set at game init, consumed on the first game frame
+
+	ds 1010
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -140,6 +146,10 @@ GymDispatch::
 	jr   z, .gameInit
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
+	cp   GS_GAME_TYPE_MAIN
+	jr   z, .menu
+	cp   GS_IN_GAME_MAIN
+	jr   z, .inGameMain
 
 ; The original main handler only calls bank-0 routines, so we can run it
 ; ourselves and then correct what it did. Fixing up afterwards is the only way
@@ -191,7 +201,23 @@ GymDispatch::
 ; repeat the sequence, not continue it.
 .gameInit:
 	call GymArmSeed
+	call GymArmDrill
 	ld   hl, GameState0a_InGameInit
+	ret
+
+; The Gym menu, on the screen that used to offer A-TYPE and B-TYPE. The original
+; handler never runs - this is a replacement, not an extension.
+.menu:
+	call GymMenu
+	ld   hl, Stub_148c
+	ret
+
+; Every gameplay frame. Anything a trainer must do after the original's in-game
+; init has run belongs here: that init clears the line count and the score, so
+; setting them beforehand achieves nothing.
+.inGameMain:
+	call GymDrillApply
+	ld   hl, GameState00_InGameMain
 	ret
 
 
@@ -661,6 +687,377 @@ GymUpdateHighScores::
 	ld   d, h
 	ld   e, l
 	jp   SetNewHighScoreIfAchieved_SendNameAndScoreToRamBuffer
+
+
+
+; ---------------------------------------------------------------------------
+; The Gym menu
+;
+; TetrisGYM's game type menu is one scrolling list where the playable modes come
+; first and the settings follow, each row carrying its own value edited in place
+; (src/gamemode/gametypemenu/menu.asm). This is that list, on the screen the
+; original used to offer A-TYPE and B-TYPE - which was already "what do you want
+; to play", and is the only menu screen the game has. See docs/decisions/0007.
+;
+; Up/Down move, Left/Right change the value on the row, Start or A launches.
+; MUSIC is a setting, not a mode, so Start does nothing on it - the same split
+; TetrisGYM draws at MODE_GAME_QUANTITY.
+; ---------------------------------------------------------------------------
+
+DEF MODE_TETRIS     EQU 0
+DEF MODE_BTYPE      EQU 1
+DEF MODE_TRANSITION EQU 2
+DEF MODE_MUSIC      EQU 3           ; a setting: not launchable
+DEF MODE_COUNT      EQU 4
+
+DEF MENU_ROW0       EQU _SCRN0 + 6 * 32 + 3   ; first entry
+DEF MENU_STRIDE     EQU 2 * 32                ; a blank line between entries
+DEF MENU_TEXT_COL   EQU 2                     ; text starts 2 cells in
+DEF MENU_CURSOR     EQU $26                   ; the font's "*"
+
+NEWCHARMAP gymfont
+	CHARMAP "0", $00
+	CHARMAP "1", $01
+	CHARMAP "2", $02
+	CHARMAP "3", $03
+	CHARMAP "4", $04
+	CHARMAP "5", $05
+	CHARMAP "6", $06
+	CHARMAP "7", $07
+	CHARMAP "8", $08
+	CHARMAP "9", $09
+	CHARMAP "A", $0a
+	CHARMAP "B", $0b
+	CHARMAP "C", $0c
+	CHARMAP "D", $0d
+	CHARMAP "E", $0e
+	CHARMAP "F", $0f
+	CHARMAP "G", $10
+	CHARMAP "H", $11
+	CHARMAP "I", $12
+	CHARMAP "J", $13
+	CHARMAP "K", $14
+	CHARMAP "L", $15
+	CHARMAP "M", $16
+	CHARMAP "N", $17
+	CHARMAP "O", $18
+	CHARMAP "P", $19
+	CHARMAP "Q", $1a
+	CHARMAP "R", $1b
+	CHARMAP "S", $1c
+	CHARMAP "T", $1d
+	CHARMAP "U", $1e
+	CHARMAP "V", $1f
+	CHARMAP "W", $20
+	CHARMAP "X", $21
+	CHARMAP "Y", $22
+	CHARMAP "Z", $23
+	CHARMAP "-", $25
+	CHARMAP " ", TILE_BLANK
+SETCHARMAP main
+
+
+GymMenu::
+	ld   a, [wGymMenuDrawn]
+	and  a
+	jr   nz, .input
+	inc  a
+	ld   [wGymMenuDrawn], a
+	jp   GymMenuDraw
+
+.input:
+	ldh  a, [hButtonsPressed]
+	ld   c, a
+
+	bit  PADB_START, c
+	jr   nz, .launch
+	bit  PADB_A, c
+	jr   nz, .launch
+
+	bit  PADB_DOWN, c
+	jr   z, .notDown
+	ld   a, [wGymMode]
+	inc  a
+	cp   MODE_COUNT
+	jr   c, .setRow
+	xor  a
+	jr   .setRow
+
+.notDown:
+	bit  PADB_UP, c
+	jr   z, .notUp
+	ld   a, [wGymMode]
+	and  a
+	jr   nz, .decRow
+	ld   a, MODE_COUNT
+.decRow:
+	dec  a
+	jr   .setRow
+
+.notUp:
+; Left and Right edit the value on the row. Only MUSIC has one.
+	ld   a, c
+	and  PADF_LEFT | PADF_RIGHT
+	ret  z
+	ld   a, [wGymMode]
+	cp   MODE_MUSIC
+	ret  nz
+	bit  PADB_RIGHT, c
+	ld   b, 1
+	jr   nz, .adjustMusic
+	ld   b, -1
+.adjustMusic:
+	ldh  a, [hMusicType]
+	sub  MUSIC_TYPES_START
+	add  b
+	and  $03                        ; four options, wrapping
+	add  MUSIC_TYPES_START
+	ldh  [hMusicType], a
+	call PlaySongBasedOnMusicTypeChosen
+	call GymMenuSound
+	jp   GymMenuPaintRows
+
+.setRow:
+	ld   [wGymMode], a
+	call GymMenuSound
+	jp   GymMenuPaintRows
+
+; Start on a mode leaves the menu the way the original did: set the game type,
+; then hand over to that type's level select. MUSIC is a setting and is ignored.
+.launch:
+	ld   a, [wGymMode]
+	cp   MODE_MUSIC
+	ret  z
+
+	xor  a
+	ld   [wGymMenuDrawn], a         ; repaint next time we are here
+	ld   a, SND_CONFIRM_OR_LETTER_TYPED
+	ld   [wSquareSoundToPlay], a
+
+	ld   a, [wGymMode]
+	cp   MODE_BTYPE
+	jr   z, .startBType
+
+	ld   a, GAME_TYPE_A_TYPE
+	ldh  [hGameType], a
+	ld   a, GS_A_TYPE_SELECTION_INIT
+	ldh  [hGameState], a
+	ret
+
+.startBType:
+	ld   a, GAME_TYPE_B_TYPE
+	ldh  [hGameType], a
+	ld   a, GS_B_TYPE_SELECTION_INIT
+	ldh  [hGameState], a
+	ret
+
+
+GymMenuSound::
+	ld   a, SND_MOVING_SELECTION
+	ld   [wSquareSoundToPlay], a
+	ret
+
+
+; Repaint the whole screen. Done with the LCD off, as the original does for
+; every screen change, so there is no VRAM timing to respect.
+GymMenuDraw::
+	call TurnOffLCD
+	call Clear_wOam
+
+; blank the visible tilemap
+	ld   hl, _SCRN0
+	ld   de, 32 * 18
+	ld   a, TILE_BLANK
+.blank:
+	ld   [hl+], a
+	dec  de
+	ld   a, d
+	or   e
+	ld   a, TILE_BLANK
+	jr   nz, .blank
+
+	ld   hl, GymMenuTitle
+	ld   de, _SCRN0 + 2 * 32 + 3
+	call GymMenuPutString
+
+	call GymMenuPaintRows
+
+	ld   a, LCDCF_ON|LCDCF_WIN9C00|LCDCF_BG8000|LCDCF_OBJON|LCDCF_BGON
+	ldh  [rLCDC], a
+	ret
+
+
+; hl = zero-terminated string, de = tilemap destination.
+GymMenuPutString::
+	ld   a, [hl+]
+	and  a
+	ret  z
+	ld   [de], a
+	inc  de
+	jr   GymMenuPutString
+
+
+GymMenuPaintRows::
+	ld   de, MENU_ROW0
+	ld   hl, GymMenuLabels          ; walks forward one label per row
+	ld   b, 0
+
+.nextRow:
+; the cursor cell, at the start of the row
+	push hl
+	ld   a, [wGymMode]
+	cp   b
+	ld   a, MENU_CURSOR
+	jr   z, .putCursor
+	ld   a, TILE_BLANK
+.putCursor:
+	ld   h, d
+	ld   l, e
+	ld   [hl], a
+	pop  hl
+
+; the label, two cells in. PutString leaves hl past the terminator, which is
+; the next row's label.
+	push de
+	ld   a, e
+	add  MENU_TEXT_COL
+	ld   e, a
+	jr   nc, .noCarry
+	inc  d
+.noCarry:
+	call GymMenuPutString
+	pop  de
+
+	ld   a, b
+	cp   MODE_MUSIC
+	call z, GymMenuPaintMusic
+
+; next row
+	push hl
+	ld   hl, MENU_STRIDE
+	add  hl, de
+	ld   d, h
+	ld   e, l
+	pop  hl
+	inc  b
+	ld   a, b
+	cp   MODE_COUNT
+	jr   c, .nextRow
+	ret
+
+
+; The music letter, right of its label. OFF is drawn as a dash.
+GymMenuPaintMusic::
+	push hl
+	push de
+	ld   hl, MENU_TEXT_COL + 8
+	add  hl, de
+	ldh  a, [hMusicType]
+	cp   MUSIC_TYPE_OFF
+	ld   a, $25                     ; "-"
+	jr   z, .put
+	ldh  a, [hMusicType]
+	sub  MUSIC_TYPES_START
+	add  $0a                        ; "A"
+.put:
+	ld   [hl], a
+	pop  de
+	pop  hl
+	ret
+
+
+PUSHC
+SETCHARMAP gymfont
+GymMenuTitle::
+	db "TETRIS GYM", 0
+
+; One zero-terminated label per row, in wGymMode order.
+GymMenuLabels::
+	db "TETRIS", 0
+	db "B-TYPE", 0
+	db "TRANSITION", 0
+	db "MUSIC", 0
+POPC
+
+
+; ---------------------------------------------------------------------------
+; Transition trainer
+;
+; TetrisGYM's TRANSITION (src/gamemodestate/initstate.asm, transitionModeSetup)
+; fills the line counter up to the last ten-line boundary before the level
+; advances, so you start one clear away from the speed change.
+;
+; The Game Boy's transition is that boundary: the original treats your starting
+; level as the number of tens you must clear, so a level 9 start transitions at
+; 100 lines. Ten short of it is 90.
+;
+; The one thing not carried over is TetrisGYM's score preset. Its modifier
+; exists so the score and pace readouts look like a real run at that point;
+; the Game Boy has no pace display and its transition point moves with the
+; start level, so there is nothing for the number to mean here.
+; ---------------------------------------------------------------------------
+
+GymArmDrill::
+	ld   a, [wGymMode]
+	cp   MODE_TRANSITION
+	ret  nz
+	ld   a, 1
+	ld   [wGymDrillPending], a
+	ret
+
+
+; The original's in-game init clears the line counter, so this runs on the first
+; gameplay frame instead - after it, not before.
+GymDrillApply::
+	ld   a, [wGymDrillPending]
+	and  a
+	ret  z
+	xor  a
+	ld   [wGymDrillPending], a
+
+; hATypeLinesThresholdToPassForNextLevel holds the start level, which is also
+; the number of tens that must be cleared to transition. One ten short of it is
+; where the drill begins.
+; The game levels up when lines/10 exceeds the level, so a level 9 start
+; transitions at 100 lines. Ten short of that is 90 - the level's own count of
+; tens. Level 0 transitions at 10, so its drill preloads nothing.
+	ldh  a, [hATypeLinesThresholdToPassForNextLevel]
+	and  a
+	ret  z
+	ld   b, a                       ; tens to preload, 1-22
+
+	xor  a
+	ld   c, a                       ; hundreds, BCD
+	ld   d, a                       ; tens and units, BCD
+
+.addTen:
+	ld   a, b
+	and  a
+	jr   z, .store
+	dec  b
+	ld   a, d
+	add  $10
+	daa
+	ld   d, a
+	jr   nc, .addTen
+	ld   a, c
+	add  1
+	daa
+	ld   c, a
+	jr   .addTen
+
+.store:
+	ld   a, d
+	ldh  [hNumLinesCompletedBCD], a
+	ld   a, c
+	ldh  [hNumLinesCompletedBCD+1], a
+
+; Repaint the readout: the original only redraws it on a line clear, so without
+; this the game shows 000 until the first one.
+	ld   hl, _SCRN0 + $14e
+	ld   de, hNumLinesCompletedBCD + 1
+	ld   c, 2
+	jp   DisplayBCDNum2CDigits
 
 
 ; Show whether hearts are armed, in the blank strip beside "LEVEL".

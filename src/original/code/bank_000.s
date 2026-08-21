@@ -616,7 +616,17 @@ ENDC
 ProcessGameState:
 	ldh  a, [hGameState]                                            ; $02f8
 	rst  JumpTable                                                  ; $02fa
+; --- tetris-gym-gb deviation #13 (see src/original/UPSTREAM.md) ---
+; The one per-frame gameplay hook. Trainers that have to act while the game is
+; running - starting with the transition trainer, which must set the line count
+; after the original init has cleared it - all land here rather than adding a
+; hook each. The handler itself is untouched.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState00_InGameMain
+ENDC
+; --- end deviation #13 ---
 	dw GameState01_GameOverInit
 	dw GameState02_ShuttleSceneLiftoff
 	dw GameState03_ShuttleSceneShootFire
@@ -647,7 +657,15 @@ ENDC
 	dw GameState0b_ScoreUpdateAfterBTypeLevelDone
 	dw GameState0c_UnusedPreShuttleLiftOff
 	dw GameState0d_GameOverScreenClearing
+; --- tetris-gym-gb deviation #14 (see src/original/UPSTREAM.md) ---
+; The A-TYPE/B-TYPE screen becomes the Gym menu. The Gym redraws the screen and
+; handles its own input; the original handler never runs. See docs/decisions/0007.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState0e_GameTypeMain
+ENDC
+; --- end deviation #14 ---
 	dw GameState0f_MusicTypeMain
 ; --- tetris-gym-gb deviation #5 (see src/original/UPSTREAM.md) ---
 ; Both A-type selection states route through the Gym, which runs its own logic
