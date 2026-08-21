@@ -14,8 +14,8 @@ current.
 | 4 — Replay, tooling and polish | not started |
 | 5 — Hardware validation and 1.0 | not started |
 
-**Released:** `v0.1.0`, 2026-08-21 — an early alpha, ahead of the Milestone 2
-gate below. BPS patch on
+**Released:** `v0.2.0`, 2026-08-21 — the Gym menu and the first trainer.
+Still an alpha, and still ahead of the Milestone 2 gate below. BPS patch on
 [Releases](https://github.com/Giovanniclini/tetris-gym-gb/releases).
 
 Outstanding across finished milestones:

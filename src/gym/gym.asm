@@ -114,7 +114,7 @@ wGymStateEnd::
 SECTION "Gym Core", ROMX[$4000], BANK[2]
 
 GymVersion::
-	db "TETRISGYMGB 0.1", 0
+	db "TETRISGYMGB 0.2", 0
 
 ; Entry point for the Gym, reached via FarCall with b = BANK(GymInit).
 ; Does nothing yet: Milestone 0.5 expands the cartridge, it does not add
