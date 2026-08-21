@@ -656,3 +656,86 @@ opinion data lives where I could not reach it.
 * [tetrisconcept.net — GB Tetris 999999](https://tetrisconcept.net/threads/game-boy-tetris-score-of-999999-points-and-9999-lines.1402/)
 * [Guinness — Highest score on Tetris for Game Boy](https://www.guinnessworldrecords.com/world-records/385225-highest-score-on-tetris-for-game-boy)
 * [Classic Tetris World Championship](https://thectwc.com/) · [Classic Tetris Monthly server list](https://ctm.gg/servers/)
+
+---
+
+## 8. Requests after the v0.2.0 release (GBTetris Discord, 2026-08-21)
+
+First contact with players actually holding the ROM, rather than describing what
+they would want. Recorded as evidence, not as a plan — §6.2's ranking still
+governs order.
+
+| Asked for | By | Notes |
+| --- | --- | --- |
+| **Crunch trainer** | báovofe67 [TAWS] — and a second person earlier the same day | **Two independent requests, unprompted, and the only feature named twice.** Costed in `docs/existing-hacks.md`: no new hooks needed |
+| **A way out of a drill** back to the level select | báovofe67 [TAWS] | See below — this is a naming collision, not a missing feature |
+| **(Quick)tap trainer and tap-quantity trainer** | toni | Both exist in TetrisGYM. GB's DAS is 23+9, not 16+6, so the thresholds do not port |
+| **Six-digit seeds** | Hepta [PADX] | **Second independent voice after Tolstoj**, who asked for the same thing by DM the same morning. Ours is 16-bit, chosen for compatibility with the seeded ROM in circulation |
+
+### 8.1 `A+B+Select+Start` means something different here
+
+> *"also can you made smt to get out of the game … like a+b+select+start in
+> tetrisgym"* — báovofe67 [TAWS]
+
+In TetrisGYM that combination returns you to the **menu**. Here it restarts the
+current drill in place (ADR 0005), which was a deliberate choice — *"when you are
+drilling you want another go"* — and is the behaviour the Game Boy's own soft
+reset already had.
+
+Both are useful and they are not the same thing. A player arriving from the NES
+ROM will expect the menu. **This is the first evidence that our instant restart
+is surprising to someone who knows TetrisGYM**, and it is worth solving as *two*
+gestures rather than by changing what the existing one does.
+
+### 8.2 Bug: a fumbled restart comes up paused — fixed
+
+> *"i notice that if you restart, the next box will turn off"* — báovofe67 [TAWS]
+>
+> *"the game restarts and is stopped … there is like one piece at the top ready
+> to fall and only starts going down when I press \[Start]. It only happens
+> sometime."* — Giovanni, reproducing it by hand
+
+The preview was never the problem: it is four sprites at OAM 8–11 and survives
+every restart path. **The restart itself was.**
+
+`hGamePaused` is only ever written by the pause toggle. Nothing clears it at
+game init, and in the original nothing needs to — you cannot pause a menu, so no
+game can ever begin while the flag is set. **Instant restart can.** Press Start
+first while fumbling the combination, the game pauses, and the restart then
+brings up a fresh game that is still flagged paused: a piece sits at the top and
+nothing moves until Start is pressed again. *"Only sometimes"* is exactly right —
+only when Start lands first.
+
+Measured before and after clearing the flag in `GymInGameReset`:
+
+| | board cleared | `hGamePaused` after | piece |
+| --- | --- | --- | --- |
+| before | yes | **1** | frozen |
+| after | yes | 0 | falling |
+
+Clearing the flag was not enough on its own, and the first attempt at this fix
+left the restarted game **silent** — caught by Giovanni within minutes of
+testing it. Pausing tells the sound engine to stop the music by setting
+`wGamePausedActivity` to 1 (`$1C34`); unpausing tells it to resume by setting 2
+(`$1C5E`), and the engine zeroes it once acted on. **The in-game init never
+starts the music** — it has been playing since the menu — so a restart that
+skips the unpause leaves it stopped for good. The restart now sends the engine
+its own resume signal rather than inventing one.
+
+Measured with sound emulation on, reading `rNR52`'s channel flags:
+
+| | channels seen |
+| --- | --- |
+| restart, no pause | `5, 7, 15` |
+| restart after pause, before | `9` — one constant value, silence |
+| restart after pause, after | `5, 7, 15` — identical to a plain restart |
+
+No new hook, and `tests/test_restart.py` now fumbles the combination
+deliberately and asserts both that the piece falls and that the music plays.
+`tools/emu.py` gained a `sound=` switch for it; without sound emulation every
+channel flag reads zero, which is why nothing caught this.
+
+**Worth recording how this was nearly missed.** The first diagnosis here claimed
+the combination did nothing at all while paused. It was wrong: the "restarted"
+column of that experiment was a hardcoded string in a print statement, not a
+measurement. Giovanni contradicted it from playing, and was right.
