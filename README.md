@@ -251,13 +251,12 @@ Nintendo, The Tetris Company or any rights holder.
 
 ## Credits
 
-* **The GBTetris community's romhackers**, whose work this is built on top of in two concrete
+* **The GBTetris community's romhackers**, whose work this is built on top of in three concrete
   places. The **KLM romhack** — Ospin, Tolstoj, Pascal and Hepps in lineage — established levels
-  `A`–`M`; our `L` and `M` gravity values match it exactly, by reverse engineering, so that a
-  practice level means the same thing on both. The **seeded ROM** already in circulation supplied
-  the 16-bit LFSR, which is transcribed byte for byte rather than replaced, so seeds are shareable
-  between the two. *We do not know which individuals to name for the seeded ROM — if you wrote it,
-  please tell us and we will credit you properly.*
+  `A`–`M`; our `L` and `M` gravity values match it exactly, and so does the way we stop levelling
+  at 20 or above, so a practice level means the same thing on both. The 16-bit **LFSR** came from
+  the seeded ROM in circulation, transcribed byte for byte rather than replaced — **found by
+  Ospin**, who dug it out of the public literature rather than writing it.
 * **Tolstoj**, for the reverse-engineering conversations, for the standing offer to hand off KLM
   hosting, and for reporting the SPS reset bug that our own tests could not see
   (`docs/existing-hacks.md`)
