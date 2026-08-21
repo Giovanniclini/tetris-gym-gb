@@ -687,29 +687,36 @@ ROM will expect the menu. **This is the first evidence that our instant restart
 is surprising to someone who knows TetrisGYM**, and it is worth solving as *two*
 gestures rather than by changing what the existing one does.
 
-### 8.2 Bug: the reset combination does nothing while paused
+### 8.2 Bug: a fumbled restart comes up paused — fixed
 
 > *"i notice that if you restart, the next box will turn off"* — báovofe67 [TAWS]
+>
+> *"the game restarts and is stopped … there is like one piece at the top ready
+> to fall and only starts going down when I press \[Start]. It only happens
+> sometime."* — Giovanni, reproducing it by hand
 
-The report as written does not reproduce: the next-piece preview is four sprites
-at OAM 8–11, and it stayed present and correctly placed across restarts during
-play, from the game-over screen and inside a transition drill, sampled every ten
-frames for two hundred frames after.
+The preview was never the problem: it is four sprites at OAM 8–11 and survives
+every restart path. **The restart itself was.**
 
-**What does reproduce is next to it.** Giovanni's reading — that the player is
-fumbling the combination and pressing Start first — leads straight to a real
-bug:
+`hGamePaused` is only ever written by the pause toggle. Nothing clears it at
+game init, and in the original nothing needs to — you cannot pause a menu, so no
+game can ever begin while the flag is set. **Instant restart can.** Press Start
+first while fumbling the combination, the game pauses, and the restart then
+brings up a fresh game that is still flagged paused: a piece sits at the top and
+nothing moves until Start is pressed again. *"Only sometimes"* is exactly right —
+only when Start lands first.
 
-| | |
-| --- | --- |
-| `A+B+Select+Start` while playing | restarts, as designed |
-| Start pressed first, then the combination | **nothing happens; the game stays paused** |
+Measured before and after clearing the flag in `GymInGameReset`:
 
-Start alone pauses. Pausing switches the background map from `$9800` to `$9C00`
-— the PAUSE screen, where the playfield is replaced by text, which is the
-original's own anti-cheat behaviour and is very likely the "box" that appeared
-to turn off. From there the combination is swallowed and the drill never
-restarts, so instant restart looks broken to the person using it.
+| | board cleared | `hGamePaused` after | piece |
+| --- | --- | --- | --- |
+| before | yes | **1** | frozen |
+| after | yes | 0 | falling |
 
-**This is worth fixing:** the combination should restart from a paused game too.
-It sits in `InGameCheckResetAndPause`, the same routine ADR 0005 already hooks.
+Three bytes, no new hook, and `tests/test_restart.py` now fumbles the
+combination deliberately.
+
+**Worth recording how this was nearly missed.** The first diagnosis here claimed
+the combination did nothing at all while paused. It was wrong: the "restarted"
+column of that experiment was a hardcoded string in a print statement, not a
+measurement. Giovanni contradicted it from playing, and was right.

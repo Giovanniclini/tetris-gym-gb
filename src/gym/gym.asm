@@ -1416,6 +1416,15 @@ GymInGameReset::
 	jp   Reset
 
 .restart:
+; Restart unpaused. Nothing in the original clears hGamePaused, because nothing
+; in the original can start a game while paused - you cannot pause a menu. The
+; instant restart can, and without this the new game comes up frozen with a
+; piece sitting at the top until you press Start. Reported by baovofe67, and
+; diagnosed by Giovanni: it only happens when the combination is fumbled and
+; Start lands first.
+	xor  a
+	ldh  [hGamePaused], a
+
 	ld   a, GS_IN_GAME_INIT
 	ldh  [hGameState], a
 	ld   a, 1

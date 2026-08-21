@@ -17,6 +17,7 @@ ROM = "build/tetrisgym.gb"
 COMBO = ("a", "b", "select", "start")
 hNumLinesCompletedBCD = 0xFF9E
 hGamePaused = 0xFFAB
+hCurrPieceSquarePixelY = 0xFFB2
 
 # A reboot runs the Nintendo logo and two copyright screens before the title.
 REBOOT_FRAMES = 500
@@ -37,6 +38,28 @@ def wait_playing(t, limit=300):
             t.tick(20)
             return f
     raise AssertionError(f"never got back into play (state ${t.state:02X})")
+
+
+def test_restart_from_a_paused_game_is_not_paused():
+    """Nothing in the original clears hGamePaused, because nothing in the
+    original can start a game while paused - you cannot pause a menu. Instant
+    restart can, and without clearing it the new game comes up frozen with a
+    piece at the top. Only happens when the combination is fumbled and Start
+    lands first, which is how it was reported."""
+    with Tetris(ROM) as t:
+        t.start_game_at(5)
+        t.tick(300)
+        t.press("start")                      # fumble: Start first
+        t.tick(30)
+        assert t[hGamePaused], "the game did not pause"
+
+        combo(t)
+        wait_playing(t)
+        assert not t[hGamePaused], "the restarted game is still paused"
+
+        y = t[hCurrPieceSquarePixelY]
+        t.tick(60)
+        assert t[hCurrPieceSquarePixelY] != y, "the piece is frozen at the top"
 
 
 def test_restart_is_fast():
