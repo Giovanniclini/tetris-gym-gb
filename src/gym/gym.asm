@@ -1448,4 +1448,18 @@ GymArmSeed::
 	ld   [wGymRngHi], a
 	or   b                          ; seed zero?
 	ldh  [hGymSpsEnabled], a        ; non-zero arms it, zero disarms it
+	ret  z
+
+; Reloading the LFSR is not enough on its own. The generator draws again when
+; the new piece's top six bits match the last one's ($205B), and that test reads
+; hHiddenLoadedPiece - which nothing resets between games. The original never
+; had to care, because rDIV is random either way; with a seed it means the same
+; seed deals a different sequence depending on what you played before it. Left
+; over from one game, it costs an extra draw on the first piece and shifts the
+; whole sequence by one.
+;
+; Reported by Tolstoj, 2026-08-21, and reproduced before fixing.
+; Only when SPS is armed: unseeded play stays bit-identical to the original.
+	xor  a
+	ldh  [hHiddenLoadedPiece], a
 	ret

@@ -273,3 +273,33 @@ that disagrees by a frame makes results incomparable.
 | SPS design: fill `wRandomness`, force `.predefined` | **Replace the `rDIV` read with the community's exact LFSR**, for seed compatibility |
 | 256-piece wrap an open question | Moot — we no longer use the table |
 | v1.1 the community standard "on technical grounds" | Proven: all seven patches target CRC `46DF91AD` |
+
+---
+
+## SPS: reloading the LFSR is not enough
+
+**Reported by Tolstoj, 2026-08-21; reproduced and fixed the same day.**
+
+> *"for the SPS make sure everything resets on init, so the flood prevention
+> (OR-logic) guarantees same sets"*
+
+The piece generator draws again when the new piece's top six bits match the last
+one's (`$205B`), and that test reads `hHiddenLoadedPiece` (`$FFAE`) — which
+**nothing resets between games**. The original never had to care: `rDIV` is
+random either way.
+
+With a seed it matters. Left over from a previous game, the leftover value costs
+an extra rejection on the very first draw and shifts the whole sequence by one:
+
+```
+same seed, fresh boot   [64, 72, 144, 64, 56, 136]
+same seed, after a game [48, 64, 72, 144, 64, 56]
+```
+
+Fixed by zeroing it in `GymArmSeed`, and only when a seed is armed, so unseeded
+play stays bit-identical to the original. `tests/test_sps.py` asserts a seeded
+sequence is unchanged by a game played before it.
+
+**Why our tests missed it:** they compared two runs that both started from a cold
+boot, where the byte is zero in each. Any test that starts from a clean state
+cannot see state that leaks between games.
