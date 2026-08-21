@@ -15,10 +15,17 @@ past `MODE_GAME_QUANTITY`, which is how modes and settings are separated.
 
 ## Decision
 
-**Mirror that list, on the original's A-TYPE/B-TYPE screen.** That screen is
-already "what do you want to play", and it is the only menu the game has. The
-Gym redraws its tilemap and handles its own input; the original handler never
-runs. One two-byte jump-table redirect, nothing shifts.
+**Mirror that list, on the title screen.** The Gym redraws its tilemap and
+handles its own input; the original handler never runs. Two two-byte jump-table
+redirects, nothing shifts: `$07` for the menu and `$24` to skip the copyright
+screen. The A-TYPE/B-TYPE screen and the 8.5-second copyright wait are both
+gone, and boot reaches the menu in 1.3 s instead of 9.8 s.
+
+**It has to be `$07` and no other state.** `SerialFunc0_titleScreen` (`$0078`)
+only assigns a multiplayer role while `hGameState` says `$07`, and *bounces the
+game back to the title from anywhere else*. A menu that hosts 2-player has to be
+that state. This is also why the earlier version, on `$0E`, would have
+misbehaved the moment a cable was attached.
 
 Rows: `TETRIS`, `B-TYPE`, `TRANSITION`, `SEED`, `MUSIC`. Up/Down move,
 Left/Right edit the row's value, Start or A launches. `SEED` and `MUSIC` are
@@ -75,25 +82,28 @@ start level rather than being fixed at 19 — so the number has nothing to mean
 here. The level comes from the level picker instead, where the Game Boy already
 puts it.
 
-## What stays
+## Two-player, and how it is tested
 
-**The 1 PLAYER / 2 PLAYER screen stays.** Link-cable head-to-head VS is CTWC-GB's
-*bracket format* (`docs/community-research.md` §2) — it is what the scene
-competes at, and a VS garbage trainer is on the roadmap. It is also load-bearing
-for link play itself: `GameState07_TitleScreenMain` pings
-`SB_PASSIVES_PING_IN_TITLE_SCREEN` every frame and auto-starts when a role is
-assigned, so both units have to sit on that screen to find each other. Skipping
-it would break linking in a way that would not be obvious.
+**`2 PLAYER` is a menu row.** Link-cable head-to-head VS is CTWC-GB's *bracket
+format* (`docs/community-research.md` §2), so dropping it was never an option.
+Moving it meant taking over the rendezvous the title screen was doing: a passive
+ping every frame, and the master's announcement on confirm.
 
-Picking 2 PLAYER with no cable attached falls back to 1 PLAYER
-(`.multiplayerInvalid`, `$0509`), which is the original's own behaviour when
-nothing answers the handshake — not a fault of ours.
+**Both are transcribed byte for byte**, not reimplemented — `tests/test_link.py`
+asserts the original's `$0488` and `$04C5` sequences appear verbatim in the Gym's
+banks.
 
-**The copyright screen goes.** Not the screen: the wait. `$24` draws it and
-loads the tile data and the demo piece table, then `$25` burns `$FA` frames,
-sets another `$FA`, and only then accepts a button — 8.5 s before the title on
-every boot, on a ROM whose selling point is that you restart it constantly.
-Skipping `$25` takes boot to title from 9.8 s to 1.4 s.
+**What can be tested, and what cannot.** PyBoy's serial is a stub (`set_SB`
+hard-codes `$FF`, *"connecting is not implemented yet"*), so no exchange between
+two units can be emulated. Everything the Gym itself does is still checkable, and
+is checked: that it pings every frame with the same `SC` the stock title screen
+does, that a role being assigned hands over to `$2A` with no keypress, that the
+master path starts when a partner is already found, and that with nothing
+attached the wait completes and the menu stays put.
+
+What is left unverified is the physical byte exchange — which happens in
+`SerialInterruptHandler`, original code the Gym does not touch. **Nobody has run
+link play on this ROM on hardware.** That was equally true before this change.
 
 ## Consequences
 

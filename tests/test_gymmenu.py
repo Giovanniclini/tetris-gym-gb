@@ -17,7 +17,7 @@ from tools.emu import (Tetris, sym, hATypeLevel,  # noqa: E402
 
 ROM = "build/tetrisgym.gb"
 
-GS_GAME_TYPE_MAIN = 0x0E
+GS_GAME_TYPE_MAIN = 0x07      # the menu lives on the title screen's state
 GS_A_TYPE_SELECTION_MAIN = 0x11
 GS_B_TYPE_SELECTION_MAIN = 0x13
 
@@ -29,7 +29,8 @@ LINES_LO, LINES_HI = hNumLinesCompletedBCD, hNumLinesCompletedBCD + 1
 GAME_TYPE_A, GAME_TYPE_B = 0x37, 0x77
 MUSIC_A, MUSIC_OFF = 0x1C, 0x1F
 
-MODE_TETRIS, MODE_BTYPE, MODE_TRANSITION, MODE_SEED, MODE_MUSIC = 0, 1, 2, 3, 4
+MODE_TETRIS, MODE_BTYPE, MODE_2PLAYER = 0, 1, 2
+MODE_TRANSITION, MODE_SEED, MODE_MUSIC = 3, 4, 5
 
 wGymMode = sym("wGymMode")
 
@@ -57,10 +58,7 @@ def text(t, row, cols=range(20)):
 
 
 def to_menu(t):
-    t.to_title()
-    t.press("start")
-    t.run_until_state(GS_GAME_TYPE_MAIN)
-    t.tick(20)
+    t.to_menu()
     return t
 
 
@@ -90,9 +88,10 @@ def test_the_menu_replaces_the_game_type_screen():
         to_menu(t)
         rows = [text(t, r) for r in range(18)]
         joined = "\n".join(rows)
-        for want in ("TETRIS GYM", "TETRIS", "B-TYPE", "TRANSITION", "SEED", "MUSIC"):
+        for want in ("TETRIS GYM", "TETRIS", "B-TYPE", "2 PLAYER",
+                     "TRANSITION", "SEED", "MUSIC"):
             assert want in joined, f"{want!r} missing from the menu:\n{joined}"
-        assert "A-TYPE" not in joined, "the original screen is still showing"
+        assert "1PLAYER" not in joined, "the original title screen is still showing"
 
 
 def test_the_cursor_moves_and_wraps():

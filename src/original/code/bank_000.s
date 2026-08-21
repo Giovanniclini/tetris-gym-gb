@@ -641,7 +641,17 @@ ENDC
 ; --- end deviation #9 ---
 	dw GameState05_BTypeLevelFinished
 	dw GameState06_TitleScreenInit
+; --- tetris-gym-gb deviation #16 (see src/original/UPSTREAM.md) ---
+; The title screen becomes the Gym menu. It has to be this state and no other:
+; SerialFunc0_titleScreen ($0078) only assigns a multiplayer role while
+; hGameState is $07, and bounces the game back to the title from anywhere else.
+; See docs/decisions/0007.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState07_TitleScreenMain
+ENDC
+; --- end deviation #16 ---
 	dw GameState08_GameMusicTypeInit
 	dw Stub_148c
 ; --- tetris-gym-gb deviation #12 (see src/original/UPSTREAM.md) ---
@@ -657,15 +667,7 @@ ENDC
 	dw GameState0b_ScoreUpdateAfterBTypeLevelDone
 	dw GameState0c_UnusedPreShuttleLiftOff
 	dw GameState0d_GameOverScreenClearing
-; --- tetris-gym-gb deviation #14 (see src/original/UPSTREAM.md) ---
-; The A-TYPE/B-TYPE screen becomes the Gym menu. The Gym redraws the screen and
-; handles its own input; the original handler never runs. See docs/decisions/0007.
-IF GYM
-	dw GymStateHook
-ELSE
 	dw GameState0e_GameTypeMain
-ENDC
-; --- end deviation #14 ---
 	dw GameState0f_MusicTypeMain
 ; --- tetris-gym-gb deviation #5 (see src/original/UPSTREAM.md) ---
 ; Both A-type selection states route through the Gym, which runs its own logic
@@ -705,17 +707,18 @@ ENDC
 	dw GameState21_2PlayerLoserMain
 	dw GameState22_DancersInit
 	dw GameState23_DancersMain
-	dw GameState24_CopyrightDisplay
 ; --- tetris-gym-gb deviation #15 (see src/original/UPSTREAM.md) ---
-; The copyright screen's eight-and-a-half second wait, skipped. $24 still runs,
-; so the tile data and the demo piece table are still loaded; only the timer is
-; cut. A trainer is restarted constantly and that wait is the whole boot.
+; The copyright screen, skipped entirely: 8.5 seconds before the title on every
+; boot of a ROM whose point is that you restart it constantly. Its only lasting
+; effect is copying DemoPieces into wDemoOrMultiplayerPieces, which only the
+; attract demo reads - 2-player fills that table itself at $068C.
 IF GYM
 	dw GymStateHook
 ELSE
-	dw GameState25_CopyrightWaiting
+	dw GameState24_CopyrightDisplay
 ENDC
 ; --- end deviation #15 ---
+	dw GameState25_CopyrightWaiting
 	dw GameState26_ShuttleSceneInit
 	dw GameState27_ShuttleSceneShowClouds
 	dw GameState28_ShuttleSceneFlashCloudsGetBigger

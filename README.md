@@ -110,8 +110,8 @@ Hearts are unavailable above level 20: the original computes heart speed as
 | **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
 | **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
 | **SPS** | Four hex digits on the menu's `SEED` row. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
-| **Straight to the menu** | The copyright screen's 8.5-second wait is gone — boot to the title in 1.4 s instead of 9.8 s |
-| **Gym menu** | The A-TYPE/B-TYPE screen becomes TetrisGYM's list — `TETRIS`, `B-TYPE`, `TRANSITION`, then the `SEED` and `MUSIC` settings |
+| **Straight to the menu** | Copyright and title screens gone — boot lands on the Gym menu in 1.3 s instead of 9.8 s |
+| **Gym menu** | TetrisGYM's list — `TETRIS`, `B-TYPE`, `2 PLAYER`, `TRANSITION`, then the `SEED` and `MUSIC` settings |
 | **Transition trainer** | Picks its own level and starts straight away. A level 9 start transitions at 100 lines; the drill begins at 90 |
 | **High scores per level** | `A-M` get their own slots, so the `TOP SCORE` panel tracks the level you are about to play |
 

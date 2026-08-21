@@ -206,11 +206,8 @@ def test_seed_can_be_entered_from_the_menu():
     """The SEED row of the Gym menu: A opens the digits, Left/Right pick one,
     Up/Down change it. See docs/decisions/0007."""
     with Tetris(ROM) as t:
-        t.to_title()
-        t.press("start")
-        t.run_until_state(0x0E)                # the Gym menu
-        t.tick(20)
-        for _ in range(3):
+        t.to_menu()
+        for _ in range(4):
             t.press("down")                    # TETRIS -> ... -> SEED
         t.press("a")                           # open the digits
         for nibble in (0xA, 0xC, 0xE, 0x1):
@@ -218,7 +215,7 @@ def test_seed_can_be_entered_from_the_menu():
                 t.press("up")
             t.press("right")
         t.press("a")                           # close them
-        for _ in range(3):
+        for _ in range(4):
             t.press("up")                      # back up to TETRIS
         seed = (t[wGymSeedHi] << 8) | t[wGymSeedLo]
         assert seed == 0xACE1, f"typed $ACE1, got ${seed:04X}"

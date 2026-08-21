@@ -148,11 +148,11 @@ GymDispatch::
 	jr   z, .gameInit
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
-	cp   GS_GAME_TYPE_MAIN
+	cp   GS_TITLE_SCREEN_MAIN
 	jr   z, .menu
 	cp   GS_IN_GAME_MAIN
 	jr   z, .inGameMain
-	cp   GS_COPYRIGHT_WAITING
+	cp   GS_COPYRIGHT_DISPLAY
 	jr   z, .skipCopyright
 
 ; The original main handler only calls bank-0 routines, so we can run it
@@ -209,18 +209,20 @@ GymDispatch::
 	ld   hl, GameState0a_InGameInit
 	ret
 
-; The copyright screen waits $FA frames, sets another $FA, and only then lets a
-; button through: eight and a half seconds before the title on every boot. State
-; $24 has already drawn it and loaded the tile data and demo pieces, so there is
-; nothing left to wait for.
+; The copyright screen: 8.5 seconds before the title, every boot. Its only
+; lasting effect is copying DemoPieces into wDemoOrMultiplayerPieces, and the
+; only thing that reads that is the attract demo - 2-player shuffles its own
+; table into it at $068C. The Gym menu never runs a demo, so none of it is
+; needed. The tile data comes from $06 either way.
 .skipCopyright:
 	ld   a, GS_TITLE_SCREEN_INIT
 	ldh  [hGameState], a
 	ld   hl, Stub_148c
 	ret
 
-; The Gym menu, on the screen that used to offer A-TYPE and B-TYPE. The original
-; handler never runs - this is a replacement, not an extension.
+; The Gym menu, on the title screen. The original handler never runs - this is a
+; replacement, not an extension - so the Gym has to keep pinging for a link
+; partner in its place.
 .menu:
 	call GymMenu
 	ld   hl, Stub_148c
@@ -631,11 +633,12 @@ GymUpdateHighScores::
 
 DEF MODE_TETRIS     EQU 0
 DEF MODE_BTYPE      EQU 1
-DEF MODE_TRANSITION EQU 2
-DEF MODE_LAUNCHABLE EQU 3           ; rows below this start a game
-DEF MODE_SEED       EQU 3
-DEF MODE_MUSIC      EQU 4
-DEF MODE_COUNT      EQU 5
+DEF MODE_2PLAYER    EQU 2
+DEF MODE_TRANSITION EQU 3
+DEF MODE_LAUNCHABLE EQU 4           ; rows below this start a game
+DEF MODE_SEED       EQU 4
+DEF MODE_MUSIC      EQU 5
+DEF MODE_COUNT      EQU 6
 
 DEF MENU_ROW0       EQU _SCRN0 + 6 * 32 + 3   ; first entry
 DEF MENU_STRIDE     EQU 2 * 32                ; a blank line between entries
@@ -698,8 +701,46 @@ GymMenu::
 	ret
 
 .live:
+	call GymLinkPing
+	ldh  a, [hGameState]
+	cp   GS_TITLE_SCREEN_MAIN
+	ret  nz                         ; a partner took over; stop touching the menu
+
 	call GymMenuInput
 	jp   GymMenuRepaint
+
+
+; The title screen's own rendezvous, transcribed from GameState07_TitleScreenMain
+; ($0488). A second Game Boy finds us by seeing this ping, so the menu has to
+; keep sending it - and it has to do so from state $07, because
+; SerialFunc0_titleScreen only assigns roles while hGameState says $07.
+GymLinkPing::
+	call SerialTransferWaitFunc
+	ld   a, SB_PASSIVES_PING_IN_TITLE_SCREEN
+	ldh  [rSB], a
+	ld   a, SC_REQUEST_TRANSFER|SC_PASSIVE
+	ldh  [rSC], a
+
+	ldh  a, [hSerialInterruptHandled]
+	and  a
+	ret  z                          ; nothing arrived
+
+	ldh  a, [hMultiplayerPlayerRole]
+	and  a
+	jp   nz, GymStart2Player        ; assigned a role: the master is waiting
+
+	xor  a                          ; a byte, but no role - not a partner
+	ldh  [hSerialInterruptHandled], a
+	ret
+
+
+GymStart2Player::
+	xor  a
+	ld   [wGymMenuDrawn], a         ; repaint next time we are here
+	ldh  [hTimer1], a
+	ld   a, GS_2PLAYER_GAME_MUSIC_TYPE_INIT
+	ldh  [hGameState], a
+	ret
 
 
 GymMenuInput::
@@ -857,6 +898,8 @@ GymMenuLaunch::
 	ld   a, [wGymMode]
 	cp   MODE_BTYPE
 	jr   z, .bType
+	cp   MODE_2PLAYER
+	jr   z, .twoPlayer
 	cp   MODE_TRANSITION
 	jr   z, .transition
 
@@ -881,6 +924,31 @@ GymMenuLaunch::
 	ld   a, GS_IN_GAME_INIT
 	ldh  [hGameState], a
 	ret
+
+; The master half of the handshake, transcribed from $04BF. If a role is already
+; assigned we are the master and the passive is waiting; otherwise announce
+; ourselves and wait one transfer for an answer. With no cable the transfer
+; still completes - the byte just comes back as $FF - so this cannot hang, and
+; no role is assigned, and we stay on the menu.
+.twoPlayer:
+	ldh  a, [hMultiplayerPlayerRole]
+	cp   MP_ROLE_MASTER
+	jp   z, GymStart2Player
+
+	ld   a, SB_MASTER_PRESSING_START
+	ldh  [rSB], a
+	ld   a, SC_REQUEST_TRANSFER|SC_MASTER
+	ldh  [rSC], a
+
+.waitForAnswer:
+	ldh  a, [hSerialInterruptHandled]
+	and  a
+	jr   z, .waitForAnswer
+
+	ldh  a, [hMultiplayerPlayerRole]
+	and  a
+	ret  z                          ; nobody answered: stay where we are
+	jp   GymStart2Player
 
 
 ; A = tile, HL = destination. The hardware drops tilemap writes made while a
@@ -1070,6 +1138,7 @@ GymMenuTitle::
 GymMenuLabels::
 	db "TETRIS", 0
 	db "B-TYPE", 0
+	db "2 PLAYER", 0
 	db "TRANSITION", 0
 	db "SEED", 0
 	db "MUSIC", 0

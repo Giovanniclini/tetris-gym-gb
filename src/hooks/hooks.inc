@@ -65,18 +65,22 @@
 ;                                            needs it because the original's
 ;                                            in-game init clears the line count
 ;                                            after any earlier hook could set it.
-;   HOOK_STATE_TABLE25 $0345-$0346       2  Jump-table entry for $25, the
-;                                            copyright screen's wait. Skipped
-;                                            straight to the title: $24 has
-;                                            already drawn it and loaded the
-;                                            tile data and demo pieces, so the
-;                                            only thing left was 8.5 seconds of
-;                                            timer on every boot.
-;   HOOK_STATE_TABLE0E $0317-$0318       2  Jump-table entry for $0E, the
-;                                            A-TYPE/B-TYPE screen, which becomes
-;                                            the Gym menu. The only hook that
-;                                            replaces an original handler rather
-;                                            than chaining to it.
+;   HOOK_STATE_TABLE24 $0343-$0344       2  Jump-table entry for $24, the
+;                                            copyright screen. Skipped whole:
+;                                            8.5 s before the title on every
+;                                            boot, and its only lasting effect
+;                                            is a demo piece table that only the
+;                                            attract demo reads.
+;   HOOK_STATE_TABLE07 $0309-$030A       2  Jump-table entry for $07, the title
+;                                            screen, which becomes the Gym menu.
+;                                            It has to be this state and no
+;                                            other: SerialFunc0_titleScreen
+;                                            ($0078) only assigns a multiplayer
+;                                            role while hGameState is $07, and
+;                                            bounces the game back to the title
+;                                            from anywhere else. The only hook
+;                                            that replaces an original handler
+;                                            rather than chaining to it.
 ;
 ; Nothing else in banks 0-1 may change.
 ;
