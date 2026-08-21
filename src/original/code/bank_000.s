@@ -616,7 +616,17 @@ ENDC
 ProcessGameState:
 	ldh  a, [hGameState]                                            ; $02f8
 	rst  JumpTable                                                  ; $02fa
+; --- tetris-gym-gb deviation #13 (see src/original/UPSTREAM.md) ---
+; The one per-frame gameplay hook. Trainers that have to act while the game is
+; running - starting with the transition trainer, which must set the line count
+; after the original init has cleared it - all land here rather than adding a
+; hook each. The handler itself is untouched.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState00_InGameMain
+ENDC
+; --- end deviation #13 ---
 	dw GameState01_GameOverInit
 	dw GameState02_ShuttleSceneLiftoff
 	dw GameState03_ShuttleSceneShootFire
@@ -630,9 +640,35 @@ ELSE
 ENDC
 ; --- end deviation #9 ---
 	dw GameState05_BTypeLevelFinished
+; --- tetris-gym-gb deviation #17 (see src/original/UPSTREAM.md) ---
+; The title screen's init, replaced by the Gym menu's, so the original title is
+; never drawn - chaining to it flashes for a frame before the menu paints over.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState06_TitleScreenInit
+ENDC
+; --- end deviation #17 ---
+; --- tetris-gym-gb deviation #16 (see src/original/UPSTREAM.md) ---
+; The title screen becomes the Gym menu. It has to be this state and no other:
+; SerialFunc0_titleScreen ($0078) only assigns a multiplayer role while
+; hGameState is $07, and bounces the game back to the title from anywhere else.
+; See docs/decisions/0007.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState07_TitleScreenMain
+ENDC
+; --- end deviation #16 ---
+; --- tetris-gym-gb deviation #18 (see src/original/UPSTREAM.md) ---
+; B on a level select goes here, which would load the A-TYPE/B-TYPE screen the
+; Gym menu replaced. Sent back to the menu instead.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState08_GameMusicTypeInit
+ENDC
+; --- end deviation #18 ---
 	dw Stub_148c
 ; --- tetris-gym-gb deviation #12 (see src/original/UPSTREAM.md) ---
 ; Routed through the Gym so the configured seed is loaded into the LFSR every
@@ -687,7 +723,17 @@ ENDC
 	dw GameState21_2PlayerLoserMain
 	dw GameState22_DancersInit
 	dw GameState23_DancersMain
+; --- tetris-gym-gb deviation #15 (see src/original/UPSTREAM.md) ---
+; The copyright screen, skipped entirely: 8.5 seconds before the title on every
+; boot of a ROM whose point is that you restart it constantly. Its only lasting
+; effect is copying DemoPieces into wDemoOrMultiplayerPieces, which only the
+; attract demo reads - 2-player fills that table itself at $068C.
+IF GYM
+	dw GymStateHook
+ELSE
 	dw GameState24_CopyrightDisplay
+ENDC
+; --- end deviation #15 ---
 	dw GameState25_CopyrightWaiting
 	dw GameState26_ShuttleSceneInit
 	dw GameState27_ShuttleSceneShowClouds

@@ -276,10 +276,20 @@ Stages:
 Every build prints a budget line, because on this target space is a first-class concern:
 
 ```
-bank 0: 12/165 bytes free (hooks: 4 declared, 11 bytes)
-bank 1: 88/88 free   bank 2: 9314/16384 free   bank 3: 14002/16384 free
-WRAM gym: 431/1024 used    SRAM: 1.2 KB used
+free space:
+  ROM0 bank #0     0 bytes   (51 reserved for the header)
+  ROMX bank #1     40 bytes
+  ROMX bank #2     14915 bytes
+  WRAM0 bank #0    691 bytes
+  HRAM bank #0     0 bytes
 ```
+
+**Bank 0 is full.** The 51 bytes the linker reports empty are the Nintendo logo
+(`$0104-$0133`) and the header checksums (`$014D-$014F`), which `rgbfix` fills
+after linking — the boot ROM refuses to run a cartridge whose logo does not
+match, so writing there bricks the ROM. `--freespace` excludes them rather than
+inviting the mistake. Everything bank 0 gained is in reclaimed `ds` padding
+(`src/hooks/hooks.inc`), and there is none of that left either.
 
 ---
 

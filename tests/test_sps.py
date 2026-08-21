@@ -203,22 +203,26 @@ def test_the_seed_is_reloaded_at_the_start_of_every_game():
 
 
 def test_seed_can_be_entered_from_the_menu():
-    """Grid -> Right on 9 -> level field -> Right -> four hex digits, each
-    changed with Up and Down."""
+    """The SEED row of the Gym menu: A opens the digits, Left/Right pick one,
+    Up/Down change it. See docs/decisions/0007."""
     with Tetris(ROM) as t:
-        t.to_level_select()
-        t.tick(10)
-        while t[hATypeLevel] < 9:
-            t.press("right")
-        t.press("right")                       # level field
-        t.press("right")                       # first seed digit
+        t.to_menu()
+        for _ in range(4):
+            t.press("down")                    # TETRIS -> ... -> SEED
+        t.press("a")                           # open the digits
         for nibble in (0xA, 0xC, 0xE, 0x1):
             for _ in range(nibble):
                 t.press("up")
             t.press("right")
+        t.press("a")                           # close them
+        for _ in range(4):
+            t.press("up")                      # back up to TETRIS
         seed = (t[wGymSeedHi] << 8) | t[wGymSeedLo]
         assert seed == 0xACE1, f"typed $ACE1, got ${seed:04X}"
 
+        t.press("start")                       # TETRIS -> the level select
+        t.run_until_state(0x11)
+        t.tick(6)
         t.press("start")
         t.run_until_state(GS_IN_GAME_MAIN)
         assert t[hGymSpsEnabled] != 0, "a non-zero seed should arm SPS"

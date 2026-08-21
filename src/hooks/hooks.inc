@@ -58,6 +58,45 @@
 ;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
 ;                                            so levelling up from an L or M
 ;                                            start cannot run past the table.
+;   HOOK_STATE_TABLE00 $02FB-$02FC       2  Jump-table entry for $00, the
+;                                            per-frame gameplay state. The one
+;                                            hook trainers act from while a game
+;                                            is running - the transition trainer
+;                                            needs it because the original's
+;                                            in-game init clears the line count
+;                                            after any earlier hook could set it.
+;   HOOK_STATE_TABLE24 $0343-$0344       2  Jump-table entry for $24, the
+;                                            copyright screen. Skipped whole:
+;                                            8.5 s before the title on every
+;                                            boot, and its only lasting effect
+;                                            is a demo piece table that only the
+;                                            attract demo reads.
+;   HOOK_STATE_TABLE06 $0307-$030C       6  Jump-table entries for $06 (title
+;                                            init), $07 (title main) and $08.
+;                                            The title screen becomes the Gym
+;                                            menu, drawn by $06 so the original
+;                                            never appears even for a frame. $07 is the
+;                                            screen, which becomes the Gym menu.
+;                                            It has to be this state and no
+;                                            other: SerialFunc0_titleScreen
+;                                            ($0078) only assigns a multiplayer
+;                                            role while hGameState is $07, and
+;                                            bounces the game back to the title
+;                                            from anywhere else. The only hook
+;                                            that replaces an original handler
+;                                            rather than chaining to it - and
+;                                            for $08, which B on a level select
+;                                            reaches, sent back to the menu so
+;                                            the A-TYPE/B-TYPE screen the menu
+;                                            replaced is never drawn.
+;   GYM_BANK1_THUNK   $6430-$644F        32  LoadAsciiAndMenuScreenGfx is in
+;                                            bank 0 but reads Gfx_Ascii from
+;                                            bank 1, so it cannot be called
+;                                            while bank 2 is mapped. This thunk
+;                                            is what the menu far-calls to load
+;                                            its tileset. A new section in the
+;                                            linker's own empty gap, not an
+;                                            insertion.
 ;
 ; Nothing else in banks 0-1 may change.
 ;

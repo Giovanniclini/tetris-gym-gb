@@ -65,3 +65,23 @@ GymRandom::
 	ld   b, a
 	pop  hl
 	ret
+
+
+; ---------------------------------------------------------------------------
+; Bank 1 thunk
+;
+; LoadAsciiAndMenuScreenGfx lives in bank 0 but reads Gfx_Ascii from bank 1
+; ($415F), so it cannot be called while bank 2 is mapped - that address holds
+; Gym code. Bank-2 code must not switch banks itself (ADR 0001), so the call
+; happens from here, reached through FarCall with bank 1 selected.
+;
+; In the empty gap the linker reports between the demo steps and the demo piece
+; table. A new section in a hole, not an insertion.
+; ---------------------------------------------------------------------------
+
+SECTION "Gym Bank 1 Thunk", ROMX[$6430], BANK[1]
+
+GymLoadMenuGfx::
+	call TurnOffLCD
+	call LoadAsciiAndMenuScreenGfx
+	ret

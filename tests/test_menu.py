@@ -24,7 +24,7 @@ HISCORE_SIZEOF = 27                             # src/original/include/structs.s
 
 wGymFocus = sym("wGymFocus")
 wGymPickerLevel = sym("wGymPickerLevel")
-FOCUS_GRID, FOCUS_LEVEL, FOCUS_SEED = 0, 1, 2
+FOCUS_GRID, FOCUS_LEVEL = 0, 1
 
 GRID_CELLS = ([0x9800 + 6 * 32 + 5 + 2 * i for i in range(5)]
               + [0x9800 + 8 * 32 + 5 + 2 * i for i in range(5)])
@@ -174,13 +174,16 @@ def test_the_level_field_swallows_up_and_down():
             assert t[wGymFocus] == FOCUS_LEVEL, "focus changed"
 
 
-def test_right_and_left_walk_between_the_fields():
+def test_the_level_field_is_the_only_one_left():
+    """The seed moved to the Gym menu (docs/decisions/0007), so Right on the
+    level field has nowhere to go and must be swallowed rather than reaching
+    the original underneath."""
     with Tetris(ROM) as t:
         open_picker(t)
+        before = t[hATypeLevel]
         t.press("right")
-        assert t[wGymFocus] == FOCUS_SEED, f"Right should enter the seed, focus is {t[wGymFocus]}"
-        t.press("left")
-        assert t[wGymFocus] == FOCUS_LEVEL, f"Left should come back, focus is {t[wGymFocus]}"
+        assert t[wGymFocus] == FOCUS_LEVEL, f"focus left the level field: {t[wGymFocus]}"
+        assert t[hATypeLevel] == before, "grid cursor moved under the level field"
 
 
 def test_starting_from_the_picker_uses_its_level():

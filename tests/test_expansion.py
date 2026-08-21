@@ -22,10 +22,16 @@ ALLOWED_RANGES = [
     (0x00DA, 0x00FF, "HOOK_TRAMPOLINE - Gym far-call trampoline in entry-point padding"),
     (0x0034, 0x003F, "GYM_RESET_STUB - instant-restart far-call stub"),
     (0x02D3, 0x02D5, "HOOK_MAINLOOP_RST - MainLoop reset check routed via the Gym"),
+    (0x02FB, 0x02FC, "HOOK_STATE_TABLE_00 - per-frame gameplay state, for trainers"),
     (0x0303, 0x0304, "HOOK_STATE_TABLE_04 - level-ended state routed via the Gym"),
+    (0x0307, 0x030C, "HOOK_STATE_TABLE_06/07/08 - the title screen is the Gym menu, "
+                     "drawn by $06 so the original never appears; B from a level "
+                     "select comes back to it"),
+    (0x6430, 0x644F, "GYM_BANK1_THUNK - loads the menu tileset, which lives in bank 1"),
     (0x030F, 0x0310, "HOOK_STATE_TABLE_0A - in-game init routed via the Gym"),
     (0x031B, 0x031E, "HOOK_STATE_TABLE - A-type selection states routed via the Gym"),
     (0x0325, 0x0326, "HOOK_STATE_TABLE_15 - name entry routed via the Gym"),
+    (0x0343, 0x0344, "HOOK_STATE_TABLE_24 - copyright screen skipped entirely"),
     (0x1B6F, 0x1B71, "HOOK_RNG_BTYPE - B-type garbage draw routed via GymRandom"),
     (0x1C14, 0x1C15, "HOOK_INGAME_RST - in-game reset check routed via the Gym"),
     (0x2043, 0x2045, "HOOK_RNG_PIECE - piece generator draw routed via GymRandom"),

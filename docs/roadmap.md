@@ -171,8 +171,8 @@ is the difference between one attempt and twenty.
 - [x] Instant restart returns to a fresh game with identical settings in under 1 second (measured: 0.17 s)
 - [ ] Settings survive a power cycle on real hardware
 - [x] DAS constants verified unchanged; ARE and line-clear delay still to assert behaviourally
-- [ ] Hook count ≤ 4, all declared and justified
-- [ ] `--original` still byte-exact
+- [x] ~~Hook count ≤ 4~~ — retired, `docs/decisions/0008`: every hook declared, diff-tested and justified instead
+- [x] `--original` still byte-exact
 
 ---
 
@@ -195,6 +195,10 @@ come from `rDIV` as they always did.
 
 **Status 2026-08-21:** levels A–M have their own high-score slots, so a score is
 filed and shown under the level it was played at (`docs/decisions/0006`).
+
+**Status 2026-08-21:** the A-TYPE/B-TYPE screen is now the Gym menu, modelled on
+TetrisGYM's list, and carries the first trainer — TRANSITION
+(`docs/decisions/0007`).
 
 Work follows the revised list in `docs/community-research.md` §6.2:
 
@@ -231,10 +235,10 @@ Work follows the revised list in `docs/community-research.md` §6.2:
    double / 2 per triple / 4 per Tetris.
 
 **Acceptance criteria**
-- [ ] **SPS: the same seed produces a byte-identical piece sequence across two runs**, asserted in tests
+- [x] **SPS: the same seed produces a byte-identical piece sequence across two runs**, asserted in tests
 - [ ] **Level starts A–M match the KLM ROM's speed and scoring exactly**, verified against KLM itself
 - [ ] Sprint timer agrees with the existing qual ROM to the frame on the same inputs
-- [ ] Transition trainer drops the player at a chosen line count with correct level, gravity and score state
+- [x] Transition trainer drops the player at a chosen line count with correct level, gravity and score state
 - [ ] 40-line sprint: timer starts on first piece, stops on the 40th line, accurate to ±0 frames
       (verified against an emulator frame count, not a wall clock)
 - [ ] Seeded sequences match the original's 2-player behaviour (same-pieces parity)
@@ -242,7 +246,7 @@ Work follows the revised list in `docs/community-research.md` §6.2:
 - [ ] Garbage generation matches the documented VS rules
 - [ ] VBlank budget measured and documented; HUD rendering stays within it
 - [ ] All timing tests from M1 still pass with every trainer enabled
-- [ ] `--original` still byte-exact; hook count ≤ 8
+- [x] `--original` still byte-exact (hook count cap retired — `docs/decisions/0008`)
 
 **Ship a public alpha here** (BPS patch, release notes, README feature table) and take it to the
 GBTetris Discord. Real feedback should reorder everything after this point.

@@ -97,7 +97,14 @@ wGymRngHi:: db
 wGymSeedLo:: db
 wGymSeedHi:: db
 
-	ds 1013
+; Gym menu. wGymMode is the row the cursor sits on, and survives into the game
+; so trainers can ask which drill is running.
+wGymMode::        db        ; MODE_TETRIS / MODE_BTYPE / MODE_TRANSITION
+wGymDrillPending:: db       ; set at game init, consumed on the first game frame
+wGymDrillLevel::  db        ; the level the TRANSITION row is set to
+wGymSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
+
+	ds 1009
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -140,6 +147,16 @@ GymDispatch::
 	jr   z, .gameInit
 	cp   GS_A_TYPE_SELECTION_INIT
 	jr   z, .init
+	cp   GS_TITLE_SCREEN_MAIN
+	jp   z, .menu
+	cp   GS_TITLE_SCREEN_INIT
+	jp   z, .menuInit
+	cp   GS_GAME_MUSIC_TYPE_INIT
+	jp   z, .backToMenu
+	cp   GS_IN_GAME_MAIN
+	jp   z, .inGameMain
+	cp   GS_COPYRIGHT_DISPLAY
+	jr   z, .skipCopyright
 
 ; The original main handler only calls bank-0 routines, so we can run it
 ; ourselves and then correct what it did. Fixing up afterwards is the only way
@@ -191,7 +208,106 @@ GymDispatch::
 ; repeat the sequence, not continue it.
 .gameInit:
 	call GymArmSeed
+	call GymArmDrill
 	ld   hl, GameState0a_InGameInit
+	ret
+
+; The copyright screen: 8.5 seconds before the title, every boot. Its only
+; lasting effect is copying DemoPieces into wDemoOrMultiplayerPieces, and the
+; only thing that reads that is the attract demo - 2-player shuffles its own
+; table into it at $068C. The Gym menu never runs a demo, so none of it is
+; needed. The tile data comes from $06 either way.
+.skipCopyright:
+	ld   a, GS_TITLE_SCREEN_INIT
+	ldh  [hGameState], a
+	ld   hl, Stub_148c
+	ret
+
+; The title screen's init, replaced so the original title is never drawn. The
+; clears are the original's ($03AE), transcribed; only the screen is ours.
+;
+; The screen buffer clear is not cosmetic. InGameCheckIfAnyTetrisRowsComplete
+; ($213E) scans wGameScreenBuffer for TILE_EMPTY to decide which rows are full -
+; leave it holding anything else and every row reads as complete the moment the
+; first piece lands, which overruns a four-entry list and hangs the game.
+.menuInit:
+	xor  a
+	ldh  [hIsRecordingDemo], a
+	ldh  [hPieceFallingState], a
+	ldh  [hTetrisFlashCount], a
+	ldh  [hPieceCollisionDetected], a
+	ldh  [h1stHighScoreHighestByteForLevel], a
+	ldh  [hNumLinesCompletedBCD + 1], a
+	ldh  [hRowsShiftingDownState], a
+	ldh  [hMustEnterHighScore], a
+	call ClearPointersToCompletedTetrisRows
+	call ClearScoreCategoryVarsAndTotalScore
+
+	ld   hl, wGameScreenBuffer
+.clearScreenBuffer:
+	ld   a, TILE_EMPTY
+	ld   [hl+], a
+	ld   a, h
+	cp   HIGH(wGameScreenBuffer.end)
+	jr   nz, .clearScreenBuffer
+
+; The walls and the floor. Not decoration: the falling piece collides against
+; what is in this buffer, so without them a piece falls past the bottom for
+; ever and no game ever ends.
+	ld   hl, wGameScreenBuffer + 1
+	call DisplayBlackColumnFromHLdown
+	ld   hl, wGameScreenBuffer + $c
+	call DisplayBlackColumnFromHLdown
+
+	ld   hl, wGameScreenBuffer + $241
+	ld   b, $0c
+	ld   a, TILE_BLACK
+.displayBlackRow:
+	ld   [hl+], a
+	dec  b
+	jr   nz, .displayBlackRow
+
+; serial back on: the menu is where a link partner finds us
+	ld   a, IEF_VBLANK | IEF_SERIAL
+	ldh  [rIE], a
+
+	ld   a, SEED_IDLE
+	ld   [wGymSeedDigit], a
+	call GymMenuDraw
+
+; Start the music the MUSIC row is set to. The screens this menu replaced each
+; did their own: the title screen played MUS_TITLE_SCREEN, the A/B screen played
+; the chosen type ($1481). The chosen type is right here - you audition it on
+; the row - so that is the one to play. Without this the menu is silent until
+; you nudge the row, which is what gave it away.
+	call PlaySongBasedOnMusicTypeChosen
+	ld   a, GS_TITLE_SCREEN_MAIN
+	ldh  [hGameState], a
+	ld   hl, Stub_148c
+	ret
+
+; B on a level select goes to $08, which would load the A-TYPE/B-TYPE screen.
+; Send it back to the Gym menu instead - that is where it came from.
+.backToMenu:
+	ld   a, GS_TITLE_SCREEN_INIT
+	ldh  [hGameState], a
+	ld   hl, Stub_148c
+	ret
+
+; The Gym menu, on the title screen. The original handler never runs - this is a
+; replacement, not an extension - so the Gym has to keep pinging for a link
+; partner in its place.
+.menu:
+	call GymMenu
+	ld   hl, Stub_148c
+	ret
+
+; Every gameplay frame. Anything a trainer must do after the original's in-game
+; init has run belongs here: that init clears the line count and the score, so
+; setting them beforehand achieves nothing.
+.inGameMain:
+	call GymDrillApply
+	ld   hl, GameState00_InGameMain
 	ret
 
 
@@ -218,8 +334,6 @@ GymDispatch::
 ; ---------------------------------------------------------------------------
 
 DEF PICKER_CELL   EQU _SCRN0 + 6 * 32 + 16
-DEF SEED_LABEL    EQU _SCRN0 + 9 * 32 + 15
-DEF SEED_CELL     EQU _SCRN0 + 10 * 32 + 15
 DEF HEART_CELL    EQU _SCRN0 + 4 * 32 + 14
 DEF TILE_HEART    EQU $27
 DEF TILE_FRAME    EQU $2c       ; what the original draws in the heart cell
@@ -228,13 +342,7 @@ DEF GRID_LAST     EQU 9
 
 DEF FOCUS_GRID    EQU 0
 DEF FOCUS_LEVEL   EQU 1
-DEF FOCUS_SEED    EQU 2         ; .. FOCUS_SEED+3, leftmost digit first
 
-; Font tiles. The game's charmap puts A-Z at $0A-$23; it lives in includes.s,
-; which this file does not include, so the letters we need are spelled out.
-DEF TILE_D        EQU $0d
-DEF TILE_E        EQU $0e
-DEF TILE_S        EQU $1c
 
 
 GymLevelSelectInit::
@@ -316,10 +424,7 @@ GymLevelSelectMain::
 .afterSelect:
 	ld   a, [wGymFocus]
 	and  a
-	jr   z, .gridFocus
-	cp   FOCUS_LEVEL
-	jr   z, .levelFocus
-	jr   .seedFocus
+	jr   nz, .levelFocus
 
 ; --- the grid has focus: the only thing we add is Right on the last cell ---
 .gridFocus:
@@ -345,10 +450,7 @@ GymLevelSelectMain::
 
 .levelNotLeft:
 	bit  PADB_RIGHT, c
-	jr   z, .levelNotRight
-	ld   a, FOCUS_SEED              ; on into the seed, leftmost digit
-	ld   [wGymFocus], a
-	jr   .consume
+	jr   nz, .consume               ; nothing to the right of the level now
 
 .levelNotRight:
 	bit  PADB_UP, c
@@ -369,46 +471,6 @@ GymLevelSelectMain::
 	dec  a
 	ld   [wGymPickerLevel], a
 	jr   .consume
-
-; --- a seed digit has focus ---
-.seedFocus:
-	bit  PADB_UP, c
-	jr   z, .seedNotUp
-	ld   b, 1
-	call GymAdjustSeedNibble
-	jr   .consume
-
-.seedNotUp:
-	bit  PADB_DOWN, c
-	jr   z, .seedNotDown
-	ld   b, -1
-	call GymAdjustSeedNibble
-	jr   .consume
-
-.seedNotDown:
-	bit  PADB_RIGHT, c
-	jr   z, .seedNotRight
-	ld   a, [wGymFocus]
-	cp   FOCUS_SEED + 3
-	jr   nc, .consume               ; already on the last digit
-	inc  a
-	ld   [wGymFocus], a
-	jr   .consume
-
-.seedNotRight:
-	bit  PADB_LEFT, c
-	ret  z
-	ld   a, [wGymFocus]
-	cp   FOCUS_SEED + 1
-	jr   nc, .seedLeftWithin
-
-	ld   a, FOCUS_LEVEL             ; back up to the level field
-	ld   [wGymFocus], a
-	jr   .consume
-
-.seedLeftWithin:
-	dec  a
-	ld   [wGymFocus], a
 
 .consume:
 	ldh  a, [hButtonsPressed]
@@ -489,11 +551,8 @@ GymShowGridCursor::
 
 
 ; Add B (1 or -1) to the nibble the focus is on, wrapping 0-F.
+; C = digit index 0-3, leftmost first.
 GymAdjustSeedNibble::
-	ld   a, [wGymFocus]
-	sub  FOCUS_SEED
-	ld   c, a                       ; c = digit index 0-3
-
 	call GymReadSeedNibble
 	add  b
 	and  $0f
@@ -567,38 +626,6 @@ GymPaintFields::
 	call GymBlankIfFocused
 	ld   [PICKER_CELL], a
 
-; label - explicit tile indices, because no charmap is active in this file and
-; a string literal would assemble as ASCII
-	ld   hl, SEED_LABEL
-	ld   a, TILE_S
-	ld   [hl+], a
-	ld   a, TILE_E
-	ld   [hl+], a
-	ld   [hl+], a
-	ld   a, TILE_D
-	ld   [hl], a
-
-; four digits - the font puts 0-9 at $00-$09 and A-F at $0A-$0F, so the tile is
-; the nibble
-	ld   hl, SEED_CELL
-	ld   c, 0
-
-.digitLoop:
-	push hl
-	call GymReadSeedNibble
-	ld   b, a
-	ld   a, c
-	add  FOCUS_SEED
-	ld   d, a                       ; d = the focus value for this digit
-	ld   a, b
-	ld   b, d
-	call GymBlankIfFocused
-	pop  hl
-	ld   [hl+], a
-	inc  c
-	ld   a, c
-	cp   4
-	jr   c, .digitLoop
 	ret
 
 
@@ -661,6 +688,661 @@ GymUpdateHighScores::
 	ld   d, h
 	ld   e, l
 	jp   SetNewHighScoreIfAchieved_SendNameAndScoreToRamBuffer
+
+
+
+; ---------------------------------------------------------------------------
+; The Gym menu
+;
+; TetrisGYM's game type menu is one scrolling list where the playable modes come
+; first and the settings follow, each row carrying its own value edited in place
+; (src/gamemode/gametypemenu/menu.asm). This is that list, on the screen the
+; original used to offer A-TYPE and B-TYPE - which was already "what do you want
+; to play", and is the only menu screen the game has. See docs/decisions/0007.
+;
+; Up/Down move, Left/Right change the value on the row, Start or A launches.
+; MUSIC is a setting, not a mode, so Start does nothing on it - the same split
+; TetrisGYM draws at MODE_GAME_QUANTITY.
+; ---------------------------------------------------------------------------
+
+DEF MODE_TETRIS     EQU 0
+DEF MODE_BTYPE      EQU 1
+DEF MODE_2PLAYER    EQU 2
+DEF MODE_TRANSITION EQU 3
+DEF MODE_LAUNCHABLE EQU 4           ; rows below this start a game
+DEF MODE_SEED       EQU 4
+DEF MODE_MUSIC      EQU 5
+DEF MODE_COUNT      EQU 6
+
+DEF MENU_ROW0       EQU _SCRN0 + 6 * 32 + 3   ; first entry
+DEF MENU_STRIDE     EQU 2 * 32                ; a blank line between entries
+DEF MENU_TEXT_COL   EQU 2                     ; label starts 2 cells in
+DEF MENU_VALUE_COL  EQU 13                    ; the row's value, right of it
+DEF MENU_CURSOR     EQU $26                   ; the font's "*"
+DEF SEED_IDLE       EQU $ff                   ; wGymSeedDigit when not editing
+
+NEWCHARMAP gymfont
+	CHARMAP "0", $00
+	CHARMAP "1", $01
+	CHARMAP "2", $02
+	CHARMAP "3", $03
+	CHARMAP "4", $04
+	CHARMAP "5", $05
+	CHARMAP "6", $06
+	CHARMAP "7", $07
+	CHARMAP "8", $08
+	CHARMAP "9", $09
+	CHARMAP "A", $0a
+	CHARMAP "B", $0b
+	CHARMAP "C", $0c
+	CHARMAP "D", $0d
+	CHARMAP "E", $0e
+	CHARMAP "F", $0f
+	CHARMAP "G", $10
+	CHARMAP "H", $11
+	CHARMAP "I", $12
+	CHARMAP "J", $13
+	CHARMAP "K", $14
+	CHARMAP "L", $15
+	CHARMAP "M", $16
+	CHARMAP "N", $17
+	CHARMAP "O", $18
+	CHARMAP "P", $19
+	CHARMAP "Q", $1a
+	CHARMAP "R", $1b
+	CHARMAP "S", $1c
+	CHARMAP "T", $1d
+	CHARMAP "U", $1e
+	CHARMAP "V", $1f
+	CHARMAP "W", $20
+	CHARMAP "X", $21
+	CHARMAP "Y", $22
+	CHARMAP "Z", $23
+	CHARMAP "-", $25
+	CHARMAP " ", TILE_BLANK
+SETCHARMAP main
+
+
+; The menu screen is painted by the init state and nowhere else, the way every
+; original screen works. $07 is only ever reached through $06 - including when
+; SerialFunc0_titleScreen bounces a stray serial byte back there - so there is
+; no first-entry case to handle.
+GymMenu::
+	call GymLinkPing
+	ldh  a, [hGameState]
+	cp   GS_TITLE_SCREEN_MAIN
+	ret  nz                         ; a partner took over; stop touching the menu
+
+	call GymMenuInput
+	jp   GymMenuRepaint
+
+
+; The title screen's own rendezvous, transcribed from GameState07_TitleScreenMain
+; ($0488). A second Game Boy finds us by seeing this ping, so the menu has to
+; keep sending it - and it has to do so from state $07, because
+; SerialFunc0_titleScreen only assigns roles while hGameState says $07.
+GymLinkPing::
+	call SerialTransferWaitFunc
+	ld   a, SB_PASSIVES_PING_IN_TITLE_SCREEN
+	ldh  [rSB], a
+	ld   a, SC_REQUEST_TRANSFER|SC_PASSIVE
+	ldh  [rSC], a
+
+	ldh  a, [hSerialInterruptHandled]
+	and  a
+	ret  z                          ; nothing arrived
+
+	ldh  a, [hMultiplayerPlayerRole]
+	and  a
+	jp   nz, GymStart2Player        ; assigned a role: the master is waiting
+
+	xor  a                          ; a byte, but no role - not a partner
+	ldh  [hSerialInterruptHandled], a
+	ret
+
+
+GymStart2Player::
+	xor  a
+	ldh  [hTimer1], a
+	ld   a, GS_2PLAYER_GAME_MUSIC_TYPE_INIT
+	ldh  [hGameState], a
+	ret
+
+
+GymMenuInput::
+	ldh  a, [hButtonsPressed]
+	ld   c, a
+
+; The seed needs a cursor of its own, so the row borrows the D-pad while it is
+; being edited. A gets in and out. TetrisGYM gives the seed row the same
+; treatment (seedControls in gametypemenu/menu.asm); it can leave Up and Down
+; free for the list because its list scrolls under a throttle and ours does not.
+	ld   a, [wGymSeedDigit]
+	cp   SEED_IDLE
+	jr   nz, .editingSeed
+
+	bit  PADB_START, c
+	jr   nz, .confirm
+	bit  PADB_A, c
+	jr   nz, .confirm
+
+	bit  PADB_DOWN, c
+	jr   z, .notDown
+	ld   a, [wGymMode]
+	inc  a
+	cp   MODE_COUNT
+	jr   c, .setRow
+	xor  a
+	jr   .setRow
+
+.notDown:
+	bit  PADB_UP, c
+	jr   z, .notUp
+	ld   a, [wGymMode]
+	and  a
+	jr   nz, .decRow
+	ld   a, MODE_COUNT
+.decRow:
+	dec  a
+	jr   .setRow
+
+.notUp:
+	ld   a, c
+	and  PADF_LEFT | PADF_RIGHT
+	ret  z
+	ld   b, 1
+	bit  PADB_RIGHT, c
+	jr   nz, .haveDelta
+	ld   b, -1
+.haveDelta:
+	ld   a, [wGymMode]
+	cp   MODE_MUSIC
+	jr   z, .adjustMusic
+	cp   MODE_TRANSITION
+	ret  nz
+
+; the level the drill starts on, 0-22, shown as 0-9 then A-M
+	ld   a, [wGymDrillLevel]
+	add  b
+	cp   MAX_LEVEL + 1
+	jr   c, .storeLevel
+	and  a                          ; wrapped past 0 or past M
+	ld   a, MAX_LEVEL
+	jr   nz, .storeLevel
+	xor  a
+.storeLevel:
+	ld   [wGymDrillLevel], a
+	jp   GymMenuSound
+
+.adjustMusic:
+	ldh  a, [hMusicType]
+	sub  MUSIC_TYPES_START
+	add  b
+	and  $03                        ; four options, wrapping
+	add  MUSIC_TYPES_START
+	ldh  [hMusicType], a
+	call PlaySongBasedOnMusicTypeChosen
+	jp   GymMenuSound
+
+.setRow:
+	ld   [wGymMode], a
+	jp   GymMenuSound
+
+; Start or A. On a mode it launches; on the seed it opens the digits; on any
+; other setting it does nothing, the split TetrisGYM draws at MODE_GAME_QUANTITY.
+.confirm:
+	ld   a, [wGymMode]
+	cp   MODE_SEED
+	jr   z, .editSeed
+	cp   MODE_LAUNCHABLE
+	ret  nc
+	jp   GymMenuLaunch
+
+.editSeed:
+	xor  a
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+; --- the seed row has the D-pad ---
+.editingSeed:
+	ld   d, a                       ; d = digit index
+
+	bit  PADB_START, c
+	jr   nz, .leaveSeed
+	bit  PADB_A, c
+	jr   nz, .leaveSeed
+
+	bit  PADB_UP, c
+	jr   z, .seedNotUp
+	ld   b, 1
+	jr   .seedAdjust
+.seedNotUp:
+	bit  PADB_DOWN, c
+	jr   z, .seedNotDown
+	ld   b, -1
+.seedAdjust:
+	ld   a, d
+	ld   c, a
+	call GymAdjustSeedNibble
+	jp   GymMenuSound
+
+.seedNotDown:
+	bit  PADB_RIGHT, c
+	jr   z, .seedNotRight
+	ld   a, d
+	cp   3
+	ret  nc
+	inc  a
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+.seedNotRight:
+	bit  PADB_LEFT, c
+	ret  z
+	ld   a, d
+	and  a
+	jr   z, .leaveSeed              ; Left off the first digit leaves the row
+	dec  a
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+.leaveSeed:
+	ld   a, SEED_IDLE
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+
+; Start on a mode. TETRIS and B-TYPE hand over to that type's level select, the
+; way the original screen did. TRANSITION carries its own level, so it goes
+; straight into the game - a drill you set up once and repeat.
+GymMenuLaunch::
+	ld   a, [wGymMode]
+	cp   MODE_2PLAYER
+	jr   z, .keepSerial
+; What $08 did on the way into a one-player game ($1444): serial off, and the
+; serial registers and any pending interrupt cleared. Leaving rIF holding a
+; stale serial flag is what froze the first piece.
+	ld   a, IEF_VBLANK
+	ldh  [rIE], a
+	xor  a
+	ldh  [rSB], a
+	ldh  [rSC], a
+	ldh  [rIF], a
+.keepSerial:
+	ld   a, SND_CONFIRM_OR_LETTER_TYPED
+	ld   [wSquareSoundToPlay], a
+
+	ld   a, [wGymMode]
+	cp   MODE_BTYPE
+	jr   z, .bType
+	cp   MODE_2PLAYER
+	jr   z, .twoPlayer
+	cp   MODE_TRANSITION
+	jr   z, .transition
+
+	ld   a, GAME_TYPE_A_TYPE
+	ldh  [hGameType], a
+	ld   a, GS_A_TYPE_SELECTION_INIT
+	ldh  [hGameState], a
+	ret
+
+.bType:
+	ld   a, GAME_TYPE_B_TYPE
+	ldh  [hGameType], a
+	ld   a, GS_B_TYPE_SELECTION_INIT
+	ldh  [hGameState], a
+	ret
+
+.transition:
+	ld   a, GAME_TYPE_A_TYPE
+	ldh  [hGameType], a
+	ld   a, [wGymDrillLevel]
+	ldh  [hATypeLevel], a
+	ld   a, GS_IN_GAME_INIT
+	ldh  [hGameState], a
+	ret
+
+; The master half of the handshake, transcribed from $04BF. If a role is already
+; assigned we are the master and the passive is waiting; otherwise announce
+; ourselves and wait one transfer for an answer. With no cable the transfer
+; still completes - the byte just comes back as $FF - so this cannot hang, and
+; no role is assigned, and we stay on the menu.
+.twoPlayer:
+	ldh  a, [hMultiplayerPlayerRole]
+	cp   MP_ROLE_MASTER
+	jp   z, GymStart2Player
+
+	ld   a, SB_MASTER_PRESSING_START
+	ldh  [rSB], a
+	ld   a, SC_REQUEST_TRANSFER|SC_MASTER
+	ldh  [rSC], a
+
+.waitForAnswer:
+	ldh  a, [hSerialInterruptHandled]
+	and  a
+	jr   z, .waitForAnswer
+
+	ldh  a, [hMultiplayerPlayerRole]
+	and  a
+	ret  z                          ; nobody answered: stay where we are
+	jp   GymStart2Player
+
+
+; A = tile, HL = destination. The hardware drops tilemap writes made while a
+; line is being drawn, so every cell the menu paints goes through here.
+; Preserves BC and DE, which StoreAinHLwhenLCDFree does not.
+GymPutTile::
+	push bc
+	call StoreAinHLwhenLCDFree
+	pop  bc
+	ret
+
+
+GymMenuSound::
+	ld   a, SND_MOVING_SELECTION
+	ld   [wSquareSoundToPlay], a
+	ret
+
+
+; The one-off paint, with the LCD off - the labels never change afterwards.
+GymMenuDraw::
+	ld   b, BANK(GymLoadMenuGfx)
+	ld   hl, GymLoadMenuGfx
+	call FarCall                    ; LCD off, then the menu tileset
+	call Clear_wOam
+
+	ld   hl, _SCRN0
+	ld   bc, 32 * 18
+.blank:
+	ld   a, TILE_BLANK
+	ld   [hl+], a
+	dec  bc
+	ld   a, b
+	or   c
+	jr   nz, .blank
+
+	ld   hl, GymMenuTitle
+	ld   de, _SCRN0 + 2 * 32 + 3
+	call GymMenuPutString
+
+	ld   hl, GymMenuLabels
+	ld   de, MENU_ROW0 + MENU_TEXT_COL
+	ld   b, MODE_COUNT
+.nextLabel:
+	push bc
+	push de
+	call GymMenuPutString
+	pop  de
+	ld   a, e
+	add  LOW(MENU_STRIDE)
+	ld   e, a
+	jr   nc, .noCarry
+	inc  d
+.noCarry:
+	pop  bc
+	dec  b
+	jr   nz, .nextLabel
+
+	call GymMenuPaint
+
+	ld   a, LCDCF_ON|LCDCF_WIN9C00|LCDCF_BG8000|LCDCF_OBJON|LCDCF_BGON
+	ldh  [rLCDC], a
+	ret
+
+
+; Everything that changes: the cursor cells and the row values. Every write goes
+; through GymPutTile, which waits for the LCD - dropped writes are what made the
+; cursor vanish at random and left the music letter stale.
+GymMenuRepaint::
+	ld   hl, wGymBlinkTimer
+	inc  [hl]
+
+GymMenuPaint::
+	ld   de, MENU_ROW0
+	ld   b, 0
+
+.nextRow:
+	ld   a, [wGymMode]
+	cp   b
+	ld   a, MENU_CURSOR
+	jr   z, .putCursor
+	ld   a, TILE_BLANK
+.putCursor:
+	ld   h, d
+	ld   l, e
+	call GymPutTile
+
+; the value, if the row has one
+	ld   a, b
+	cp   MODE_TRANSITION
+	call z, GymMenuPaintLevel
+	ld   a, b
+	cp   MODE_SEED
+	call z, GymMenuPaintSeed
+	ld   a, b
+	cp   MODE_MUSIC
+	call z, GymMenuPaintMusic
+
+	ld   hl, MENU_STRIDE
+	add  hl, de
+	ld   d, h
+	ld   e, l
+	inc  b
+	ld   a, b
+	cp   MODE_COUNT
+	jr   c, .nextRow
+	ret
+
+
+; DE = row base. Returns HL at the row's value column.
+GymMenuValueCell::
+	ld   hl, MENU_VALUE_COL
+	add  hl, de
+	ret
+
+
+; 0-9 then A-M: the font puts those tiles at $00-$16, so the tile is the level.
+GymMenuPaintLevel::
+	call GymMenuValueCell
+	ld   a, [wGymDrillLevel]
+	jp   GymPutTile
+
+
+; Four hex digits; the tile is the nibble. The digit being edited blinks.
+GymMenuPaintSeed::
+	call GymMenuValueCell
+	push de
+	ld   d, h
+	ld   e, l
+	ld   c, 0
+.digit:
+	push de
+	call GymReadSeedNibble
+	push af
+	ld   a, [wGymSeedDigit]
+	cp   c
+	jr   nz, .draw
+	ld   a, [wGymBlinkTimer]
+	and  $10
+	jr   nz, .draw
+	pop  af
+	ld   a, TILE_BLANK
+	jr   .store
+.draw:
+	pop  af
+.store:
+	pop  de
+	ld   h, d
+	ld   l, e
+	call GymPutTile
+	inc  de
+	inc  c
+	ld   a, c
+	cp   4
+	jr   c, .digit
+	pop  de
+	ret
+
+
+; The music letter. OFF is drawn as a dash.
+GymMenuPaintMusic::
+	call GymMenuValueCell
+	ldh  a, [hMusicType]
+	cp   MUSIC_TYPE_OFF
+	ld   a, $25                     ; "-"
+	jr   z, .put
+	ldh  a, [hMusicType]
+	sub  MUSIC_TYPES_START
+	add  $0a                        ; "A"
+.put:
+	jp   GymPutTile
+
+
+; hl = zero-terminated string, de = tilemap destination.
+GymMenuPutString::
+	ld   a, [hl+]
+	and  a
+	ret  z
+	ld   [de], a
+	inc  de
+	jr   GymMenuPutString
+
+
+PUSHC
+SETCHARMAP gymfont
+GymMenuTitle::
+	db "TETRIS GYM GB", 0
+
+; One zero-terminated label per row, in wGymMode order.
+GymMenuLabels::
+	db "TETRIS", 0
+	db "B-TYPE", 0
+	db "2 PLAYER", 0
+	db "TRANSITION", 0
+	db "SEED", 0
+	db "MUSIC", 0
+POPC
+
+
+; ---------------------------------------------------------------------------
+; Transition trainer
+;
+; TetrisGYM's TRANSITION (src/gamemodestate/initstate.asm, transitionModeSetup)
+; fills the line counter up to the last ten-line boundary before the level
+; advances, so you start one clear away from the speed change.
+;
+; The Game Boy's transition is that boundary: the original treats your starting
+; level as the number of tens you must clear, so a level 9 start transitions at
+; 100 lines. Ten short of it is 90.
+;
+; The one thing not carried over is TetrisGYM's score preset. Its modifier
+; exists so the score and pace readouts look like a real run at that point;
+; the Game Boy has no pace display and its transition point moves with the
+; start level, so there is nothing for the number to mean here.
+; ---------------------------------------------------------------------------
+
+GymArmDrill::
+	ld   a, [wGymMode]
+	cp   MODE_TRANSITION
+	ret  nz
+	ld   a, 1
+	ld   [wGymDrillPending], a
+	ret
+
+
+; The original's in-game init clears the line counter, so this runs on the first
+; gameplay frame instead - after it, not before.
+GymDrillApply::
+	ld   a, [wGymDrillPending]
+	and  a
+	ret  z
+	xor  a
+	ld   [wGymDrillPending], a
+
+; hATypeLinesThresholdToPassForNextLevel holds the start level, which is also
+; the number of tens that must be cleared to transition. One ten short of it is
+; where the drill begins.
+; The game levels up when lines/10 exceeds the level, so a level 9 start
+; transitions at 100 lines. Ten short of that is 90 - the level's own count of
+; tens. Level 0 transitions at 10, so its drill preloads nothing.
+	ldh  a, [hATypeLinesThresholdToPassForNextLevel]
+	and  a
+	ret  z
+	ld   b, a                       ; tens to preload, 1-22
+
+	xor  a
+	ld   c, a                       ; hundreds, BCD
+	ld   d, a                       ; tens and units, BCD
+
+.addTen:
+	ld   a, b
+	and  a
+	jr   z, .store
+	dec  b
+	ld   a, d
+	add  $10
+	daa
+	ld   d, a
+	jr   nc, .addTen
+	ld   a, c
+	add  1
+	daa
+	ld   c, a
+	jr   .addTen
+
+.store:
+	ld   a, d
+	ldh  [hNumLinesCompletedBCD], a
+	ld   a, c
+	ldh  [hNumLinesCompletedBCD+1], a
+
+; Repaint the readout: the original only redraws it on a line clear, so without
+; this the game shows 000 until the first one.
+	jp   GymDrillPaintLines
+
+
+; The four LINES digits, leading zeros blanked, exactly as the original renders
+; them. Not DisplayBCDNum2CDigits: that writes the tilemap with a bare
+; `ld [hl+], a`, which is correct for the original - it only ever calls it with
+; the LCD idle - and drops writes anywhere else.
+GymDrillPaintLines::
+	ldh  a, [hNumLinesCompletedBCD + 1]
+	ld   d, a
+	ldh  a, [hNumLinesCompletedBCD]
+	ld   e, a
+	ld   hl, _SCRN0 + $14e
+	ld   c, 0                       ; set once a digit has been drawn
+
+	ld   a, d
+	swap a
+	call GymDrillDigit
+	ld   a, d
+	call GymDrillDigit
+	ld   a, e
+	swap a
+	call GymDrillDigit
+	ld   c, 1                       ; the units digit always shows
+	ld   a, e
+	; falls through
+
+GymDrillDigit:
+	and  $0f
+	jr   nz, .visible
+
+	ld   a, c
+	and  a
+	ld   a, TILE_EMPTY              ; nothing drawn yet: a leading zero
+	jr   z, .put
+	ld   a, TILE_0                  ; inside the number: a real zero
+	jr   .put
+
+.visible:
+	ld   c, 1
+
+.put:
+	call GymPutTile
+	inc  hl
+	ret
 
 
 ; Show whether hearts are armed, in the blank strip beside "LEVEL".
