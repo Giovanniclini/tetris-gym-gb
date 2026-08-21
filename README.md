@@ -4,7 +4,7 @@
 
 > **Status:** see [`docs/roadmap.md`](docs/roadmap.md).
 > Working today: the Gym menu, level select up to M, hearts, the transition trainer, SPS and instant restart.
-> [**Get v0.1.0**](https://github.com/Giovanniclini/tetris-gym-gb/releases) — or see
+> [**Get v0.2.0**](https://github.com/Giovanniclini/tetris-gym-gb/releases) — or see
 > [Play it](#play-it).
 
 ---
