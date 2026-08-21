@@ -64,10 +64,16 @@ def to_menu(t):
 
 def to_menu_row(t, row):
     to_menu(t)
-    for _ in range(row):
-        t.press("down")
-    assert t[wGymMode] == row, f"wanted row {row}, cursor is on {t[wGymMode]}"
-    return t
+    return goto_row(t, row)
+
+
+def goto_row(t, row):
+    """Move the cursor to a row from wherever it currently is."""
+    for _ in range(MODE_MUSIC + 1):
+        if t[wGymMode] == row:
+            return t
+        t.press("down" if t[wGymMode] < row else "up")
+    raise AssertionError(f"stuck on row {t[wGymMode]} heading for {row}")
 
 
 def test_boot_reaches_the_title_without_the_copyright_wait():
@@ -117,6 +123,56 @@ def test_the_title_init_is_transcribed_not_rewritten():
             f"{next_name} does not directly follow {name} "
             f"(${at + size:04X} vs ${next_at:04X})"
         )
+
+
+def test_the_menu_starts_its_music():
+    """The screens this menu replaced each started a song. Without one the menu
+    is silent until you nudge the MUSIC row, which is how the omission showed."""
+    with Tetris(ROM) as t:
+        songs = []
+        # $1521: `ld [wSongToStart], a` inside PlaySongBasedOnMusicTypeChosen
+        t.pb.hook_register(0, 0x1521, lambda _: songs.append(t.pb.register_file.A), None)
+        t.run_until_state(GS_GAME_TYPE_MAIN)
+        t.tick(20)
+        assert songs, "the menu asked for no music at all"
+
+        songs.clear()
+        t.press("start")
+        t.run_until_state(GS_A_TYPE_SELECTION_MAIN)
+        t.tick(20)
+        songs.clear()
+        t.press("b")
+        t.tick(40)
+        assert songs, "coming back to the menu left it silent"
+
+
+def test_settings_survive_a_round_trip_through_a_game():
+    """A trainer keeps what you set up - that is the point of it. The original
+    cleared the level whenever you passed through the title screen; the menu
+    that replaced it deliberately does not."""
+    with Tetris(ROM) as t:
+        to_menu_row(t, MODE_TRANSITION)
+        for _ in range(7):
+            t.press("right")                   # transition level 7
+
+        goto_row(t, MODE_SEED)
+        t.press("a")
+        for _ in range(0xA):
+            t.press("up")                      # first digit -> A
+        t.press("a")
+
+        level, seed = t[sym("wGymDrillLevel")], t[sym("wGymSeedHi")]
+        assert level == 7 and seed, f"setup failed: level {level}, seed hi ${seed:02X}"
+
+        goto_row(t, MODE_TETRIS)
+        t.press("start")
+        t.run_until_state(GS_A_TYPE_SELECTION_MAIN)
+        t.tick(20)
+        t.press("b")
+        t.tick(40)
+
+        assert t[sym("wGymDrillLevel")] == level, "the transition level was reset"
+        assert t[sym("wGymSeedHi")] == seed, "the seed was reset"
 
 
 def test_the_original_title_screen_never_appears():

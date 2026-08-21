@@ -138,6 +138,17 @@ link play on this ROM on hardware.** That was equally true before this change.
   the Gym's banks, in order and adjacent — the same treatment the serial ping
   gets. Deleting the floor again fails that test by name, rather than by hanging
   a game somewhere unrelated.
+* **The menu starts the music the `MUSIC` row is set to.** The screens it
+  replaced each started their own — the title screen played `MUS_TITLE_SCREEN`,
+  the A/B screen played the chosen type (`$1481`). The chosen type is the one to
+  play here, because that row is where you audition it.
+* **Settings persist; the original cleared them.** Passing through the title
+  screen cleared `hATypeLevel`, `hBTypeLevel` and `hBTypeHigh` (`$04DB`). The
+  menu does not: a trainer keeps the drill you set up, which is the same reason
+  instant restart returns you to the level you *chose* rather than the one you
+  reached (ADR 0005). Nothing depends on the clearing — `Reset` zeroes all of
+  HRAM at `$028A`, on cold boot and soft reset alike, so none of it can start as
+  garbage.
 * **B on a level select returns to the menu.** It goes to `$08`, which would
   otherwise draw the A-TYPE/B-TYPE screen the menu replaced.
 * **The line readout must be repainted by hand.** The original only redraws it

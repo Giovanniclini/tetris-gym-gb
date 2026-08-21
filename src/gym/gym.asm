@@ -274,6 +274,13 @@ GymDispatch::
 	ld   a, SEED_IDLE
 	ld   [wGymSeedDigit], a
 	call GymMenuDraw
+
+; Start the music the MUSIC row is set to. The screens this menu replaced each
+; did their own: the title screen played MUS_TITLE_SCREEN, the A/B screen played
+; the chosen type ($1481). The chosen type is right here - you audition it on
+; the row - so that is the one to play. Without this the menu is silent until
+; you nudge the row, which is what gave it away.
+	call PlaySongBasedOnMusicTypeChosen
 	ld   a, GS_TITLE_SCREEN_MAIN
 	ldh  [hGameState], a
 	ld   hl, Stub_148c
