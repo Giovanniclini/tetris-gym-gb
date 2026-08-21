@@ -45,8 +45,20 @@ machine code**.
 
 Concretely, these must never drift: gravity (the per-level table at `$1B06`), DAS (23 frames
 initial / 9 autorepeat), ARE (2 frames), line-clear delay (93 frames), the biased OR-rejection
-randomizer, left-handed Nintendo Rotation System, 10×18 playfield, scoring, and the original's
-quirks (only 16 of 18 rows are checked for line clears; the 999 999 score cap).
+randomizer, left-handed Nintendo Rotation System, 10×18 playfield, the scoring formula, and the
+original's line-clear quirk (only 16 of 18 rows are checked).
+
+**The 999 999 score cap is not on that list**, and used to be. *Corrected 2026-08-21 after
+Tolstoj pushed back.* Everything above changes how the game *plays*, so a trainer that alters one
+teaches the wrong reflexes. A score ceiling teaches nothing — it only limits what you can record,
+and the community already competes on KLM's uncapped score
+(`docs/community-research.md` §3.5.1). Keeping it as the default is right; treating it as
+untouchable was wrong.
+
+Note what the cap actually is before extending it: `wScoreBCD` is **three BCD bytes**, so 999 999
+is the ceiling of the storage, not a policy. The clamp at `$0178` writes `$99 $99 $99` on carry-out
+to stop it wrapping to zero. An uncap therefore means widening the score — storage, the in-game
+display, and `HISCORE_Score1`, which is also three bytes — not deleting five bytes of clamp.
 
 ### 2. Do not replace the original game with a new Tetris implementation
 
