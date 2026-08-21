@@ -102,8 +102,10 @@ wGymSeedHi:: db
 wGymMenuDrawn::   db        ; the menu paints once per visit, not every frame
 wGymMode::        db        ; MODE_TETRIS / MODE_BTYPE / MODE_TRANSITION
 wGymDrillPending:: db       ; set at game init, consumed on the first game frame
+wGymDrillLevel::  db        ; the level the TRANSITION row is set to
+wGymSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
 
-	ds 1010
+	ds 1008
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -244,8 +246,6 @@ GymDispatch::
 ; ---------------------------------------------------------------------------
 
 DEF PICKER_CELL   EQU _SCRN0 + 6 * 32 + 16
-DEF SEED_LABEL    EQU _SCRN0 + 9 * 32 + 15
-DEF SEED_CELL     EQU _SCRN0 + 10 * 32 + 15
 DEF HEART_CELL    EQU _SCRN0 + 4 * 32 + 14
 DEF TILE_HEART    EQU $27
 DEF TILE_FRAME    EQU $2c       ; what the original draws in the heart cell
@@ -254,13 +254,7 @@ DEF GRID_LAST     EQU 9
 
 DEF FOCUS_GRID    EQU 0
 DEF FOCUS_LEVEL   EQU 1
-DEF FOCUS_SEED    EQU 2         ; .. FOCUS_SEED+3, leftmost digit first
 
-; Font tiles. The game's charmap puts A-Z at $0A-$23; it lives in includes.s,
-; which this file does not include, so the letters we need are spelled out.
-DEF TILE_D        EQU $0d
-DEF TILE_E        EQU $0e
-DEF TILE_S        EQU $1c
 
 
 GymLevelSelectInit::
@@ -342,10 +336,7 @@ GymLevelSelectMain::
 .afterSelect:
 	ld   a, [wGymFocus]
 	and  a
-	jr   z, .gridFocus
-	cp   FOCUS_LEVEL
-	jr   z, .levelFocus
-	jr   .seedFocus
+	jr   nz, .levelFocus
 
 ; --- the grid has focus: the only thing we add is Right on the last cell ---
 .gridFocus:
@@ -371,10 +362,7 @@ GymLevelSelectMain::
 
 .levelNotLeft:
 	bit  PADB_RIGHT, c
-	jr   z, .levelNotRight
-	ld   a, FOCUS_SEED              ; on into the seed, leftmost digit
-	ld   [wGymFocus], a
-	jr   .consume
+	jr   nz, .consume               ; nothing to the right of the level now
 
 .levelNotRight:
 	bit  PADB_UP, c
@@ -395,46 +383,6 @@ GymLevelSelectMain::
 	dec  a
 	ld   [wGymPickerLevel], a
 	jr   .consume
-
-; --- a seed digit has focus ---
-.seedFocus:
-	bit  PADB_UP, c
-	jr   z, .seedNotUp
-	ld   b, 1
-	call GymAdjustSeedNibble
-	jr   .consume
-
-.seedNotUp:
-	bit  PADB_DOWN, c
-	jr   z, .seedNotDown
-	ld   b, -1
-	call GymAdjustSeedNibble
-	jr   .consume
-
-.seedNotDown:
-	bit  PADB_RIGHT, c
-	jr   z, .seedNotRight
-	ld   a, [wGymFocus]
-	cp   FOCUS_SEED + 3
-	jr   nc, .consume               ; already on the last digit
-	inc  a
-	ld   [wGymFocus], a
-	jr   .consume
-
-.seedNotRight:
-	bit  PADB_LEFT, c
-	ret  z
-	ld   a, [wGymFocus]
-	cp   FOCUS_SEED + 1
-	jr   nc, .seedLeftWithin
-
-	ld   a, FOCUS_LEVEL             ; back up to the level field
-	ld   [wGymFocus], a
-	jr   .consume
-
-.seedLeftWithin:
-	dec  a
-	ld   [wGymFocus], a
 
 .consume:
 	ldh  a, [hButtonsPressed]
@@ -515,11 +463,8 @@ GymShowGridCursor::
 
 
 ; Add B (1 or -1) to the nibble the focus is on, wrapping 0-F.
+; C = digit index 0-3, leftmost first.
 GymAdjustSeedNibble::
-	ld   a, [wGymFocus]
-	sub  FOCUS_SEED
-	ld   c, a                       ; c = digit index 0-3
-
 	call GymReadSeedNibble
 	add  b
 	and  $0f
@@ -593,38 +538,6 @@ GymPaintFields::
 	call GymBlankIfFocused
 	ld   [PICKER_CELL], a
 
-; label - explicit tile indices, because no charmap is active in this file and
-; a string literal would assemble as ASCII
-	ld   hl, SEED_LABEL
-	ld   a, TILE_S
-	ld   [hl+], a
-	ld   a, TILE_E
-	ld   [hl+], a
-	ld   [hl+], a
-	ld   a, TILE_D
-	ld   [hl], a
-
-; four digits - the font puts 0-9 at $00-$09 and A-F at $0A-$0F, so the tile is
-; the nibble
-	ld   hl, SEED_CELL
-	ld   c, 0
-
-.digitLoop:
-	push hl
-	call GymReadSeedNibble
-	ld   b, a
-	ld   a, c
-	add  FOCUS_SEED
-	ld   d, a                       ; d = the focus value for this digit
-	ld   a, b
-	ld   b, d
-	call GymBlankIfFocused
-	pop  hl
-	ld   [hl+], a
-	inc  c
-	ld   a, c
-	cp   4
-	jr   c, .digitLoop
 	ret
 
 
@@ -707,13 +620,17 @@ GymUpdateHighScores::
 DEF MODE_TETRIS     EQU 0
 DEF MODE_BTYPE      EQU 1
 DEF MODE_TRANSITION EQU 2
-DEF MODE_MUSIC      EQU 3           ; a setting: not launchable
-DEF MODE_COUNT      EQU 4
+DEF MODE_LAUNCHABLE EQU 3           ; rows below this start a game
+DEF MODE_SEED       EQU 3
+DEF MODE_MUSIC      EQU 4
+DEF MODE_COUNT      EQU 5
 
 DEF MENU_ROW0       EQU _SCRN0 + 6 * 32 + 3   ; first entry
 DEF MENU_STRIDE     EQU 2 * 32                ; a blank line between entries
-DEF MENU_TEXT_COL   EQU 2                     ; text starts 2 cells in
+DEF MENU_TEXT_COL   EQU 2                     ; label starts 2 cells in
+DEF MENU_VALUE_COL  EQU 13                    ; the row's value, right of it
 DEF MENU_CURSOR     EQU $26                   ; the font's "*"
+DEF SEED_IDLE       EQU $ff                   ; wGymSeedDigit when not editing
 
 NEWCHARMAP gymfont
 	CHARMAP "0", $00
@@ -760,19 +677,35 @@ SETCHARMAP main
 GymMenu::
 	ld   a, [wGymMenuDrawn]
 	and  a
-	jr   nz, .input
+	jr   nz, .live
 	inc  a
 	ld   [wGymMenuDrawn], a
-	jp   GymMenuDraw
+	ld   a, SEED_IDLE
+	ld   [wGymSeedDigit], a
+	call GymMenuDraw
+	ret
 
-.input:
+.live:
+	call GymMenuInput
+	jp   GymMenuRepaint
+
+
+GymMenuInput::
 	ldh  a, [hButtonsPressed]
 	ld   c, a
 
+; The seed needs a cursor of its own, so the row borrows the D-pad while it is
+; being edited. A gets in and out. TetrisGYM gives the seed row the same
+; treatment (seedControls in gametypemenu/menu.asm); it can leave Up and Down
+; free for the list because its list scrolls under a throttle and ours does not.
+	ld   a, [wGymSeedDigit]
+	cp   SEED_IDLE
+	jr   nz, .editingSeed
+
 	bit  PADB_START, c
-	jr   nz, .launch
+	jr   nz, .confirm
 	bit  PADB_A, c
-	jr   nz, .launch
+	jr   nz, .confirm
 
 	bit  PADB_DOWN, c
 	jr   z, .notDown
@@ -795,17 +728,33 @@ GymMenu::
 	jr   .setRow
 
 .notUp:
-; Left and Right edit the value on the row. Only MUSIC has one.
 	ld   a, c
 	and  PADF_LEFT | PADF_RIGHT
 	ret  z
+	ld   b, 1
+	bit  PADB_RIGHT, c
+	jr   nz, .haveDelta
+	ld   b, -1
+.haveDelta:
 	ld   a, [wGymMode]
 	cp   MODE_MUSIC
+	jr   z, .adjustMusic
+	cp   MODE_TRANSITION
 	ret  nz
-	bit  PADB_RIGHT, c
-	ld   b, 1
-	jr   nz, .adjustMusic
-	ld   b, -1
+
+; the level the drill starts on, 0-22, shown as 0-9 then A-M
+	ld   a, [wGymDrillLevel]
+	add  b
+	cp   MAX_LEVEL + 1
+	jr   c, .storeLevel
+	and  a                          ; wrapped past 0 or past M
+	ld   a, MAX_LEVEL
+	jr   nz, .storeLevel
+	xor  a
+.storeLevel:
+	ld   [wGymDrillLevel], a
+	jp   GymMenuSound
+
 .adjustMusic:
 	ldh  a, [hMusicType]
 	sub  MUSIC_TYPES_START
@@ -814,21 +763,80 @@ GymMenu::
 	add  MUSIC_TYPES_START
 	ldh  [hMusicType], a
 	call PlaySongBasedOnMusicTypeChosen
-	call GymMenuSound
-	jp   GymMenuPaintRows
+	jp   GymMenuSound
 
 .setRow:
 	ld   [wGymMode], a
-	call GymMenuSound
-	jp   GymMenuPaintRows
+	jp   GymMenuSound
 
-; Start on a mode leaves the menu the way the original did: set the game type,
-; then hand over to that type's level select. MUSIC is a setting and is ignored.
-.launch:
+; Start or A. On a mode it launches; on the seed it opens the digits; on any
+; other setting it does nothing, the split TetrisGYM draws at MODE_GAME_QUANTITY.
+.confirm:
 	ld   a, [wGymMode]
-	cp   MODE_MUSIC
-	ret  z
+	cp   MODE_SEED
+	jr   z, .editSeed
+	cp   MODE_LAUNCHABLE
+	ret  nc
+	jp   GymMenuLaunch
 
+.editSeed:
+	xor  a
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+; --- the seed row has the D-pad ---
+.editingSeed:
+	ld   d, a                       ; d = digit index
+
+	bit  PADB_START, c
+	jr   nz, .leaveSeed
+	bit  PADB_A, c
+	jr   nz, .leaveSeed
+
+	bit  PADB_UP, c
+	jr   z, .seedNotUp
+	ld   b, 1
+	jr   .seedAdjust
+.seedNotUp:
+	bit  PADB_DOWN, c
+	jr   z, .seedNotDown
+	ld   b, -1
+.seedAdjust:
+	ld   a, d
+	ld   c, a
+	call GymAdjustSeedNibble
+	jp   GymMenuSound
+
+.seedNotDown:
+	bit  PADB_RIGHT, c
+	jr   z, .seedNotRight
+	ld   a, d
+	cp   3
+	ret  nc
+	inc  a
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+.seedNotRight:
+	bit  PADB_LEFT, c
+	ret  z
+	ld   a, d
+	and  a
+	jr   z, .leaveSeed              ; Left off the first digit leaves the row
+	dec  a
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+.leaveSeed:
+	ld   a, SEED_IDLE
+	ld   [wGymSeedDigit], a
+	jp   GymMenuSound
+
+
+; Start on a mode. TETRIS and B-TYPE hand over to that type's level select, the
+; way the original screen did. TRANSITION carries its own level, so it goes
+; straight into the game - a drill you set up once and repeat.
+GymMenuLaunch::
 	xor  a
 	ld   [wGymMenuDrawn], a         ; repaint next time we are here
 	ld   a, SND_CONFIRM_OR_LETTER_TYPED
@@ -836,7 +844,9 @@ GymMenu::
 
 	ld   a, [wGymMode]
 	cp   MODE_BTYPE
-	jr   z, .startBType
+	jr   z, .bType
+	cp   MODE_TRANSITION
+	jr   z, .transition
 
 	ld   a, GAME_TYPE_A_TYPE
 	ldh  [hGameType], a
@@ -844,10 +854,19 @@ GymMenu::
 	ldh  [hGameState], a
 	ret
 
-.startBType:
+.bType:
 	ld   a, GAME_TYPE_B_TYPE
 	ldh  [hGameType], a
 	ld   a, GS_B_TYPE_SELECTION_INIT
+	ldh  [hGameState], a
+	ret
+
+.transition:
+	ld   a, GAME_TYPE_A_TYPE
+	ldh  [hGameType], a
+	ld   a, [wGymDrillLevel]
+	ldh  [hATypeLevel], a
+	ld   a, GS_IN_GAME_INIT
 	ldh  [hGameState], a
 	ret
 
@@ -858,32 +877,161 @@ GymMenuSound::
 	ret
 
 
-; Repaint the whole screen. Done with the LCD off, as the original does for
-; every screen change, so there is no VRAM timing to respect.
+; The one-off paint, with the LCD off - the labels never change afterwards.
 GymMenuDraw::
 	call TurnOffLCD
 	call Clear_wOam
 
-; blank the visible tilemap
 	ld   hl, _SCRN0
-	ld   de, 32 * 18
-	ld   a, TILE_BLANK
+	ld   bc, 32 * 18
 .blank:
-	ld   [hl+], a
-	dec  de
-	ld   a, d
-	or   e
 	ld   a, TILE_BLANK
+	ld   [hl+], a
+	dec  bc
+	ld   a, b
+	or   c
 	jr   nz, .blank
 
 	ld   hl, GymMenuTitle
 	ld   de, _SCRN0 + 2 * 32 + 3
 	call GymMenuPutString
 
-	call GymMenuPaintRows
+	ld   hl, GymMenuLabels
+	ld   de, MENU_ROW0 + MENU_TEXT_COL
+	ld   b, MODE_COUNT
+.nextLabel:
+	push bc
+	push de
+	call GymMenuPutString
+	pop  de
+	ld   a, e
+	add  LOW(MENU_STRIDE)
+	ld   e, a
+	jr   nc, .noCarry
+	inc  d
+.noCarry:
+	pop  bc
+	dec  b
+	jr   nz, .nextLabel
+
+	call GymMenuPaint
 
 	ld   a, LCDCF_ON|LCDCF_WIN9C00|LCDCF_BG8000|LCDCF_OBJON|LCDCF_BGON
 	ldh  [rLCDC], a
+	ret
+
+
+; Everything that changes: the cursor cells and the row values. Written in
+; VBlank, because with the LCD on the hardware simply drops writes made while a
+; line is being drawn - which is what made the cursor vanish at random.
+GymMenuRepaint::
+	ld   hl, wGymBlinkTimer
+	inc  [hl]
+.waitVBlank:
+	ldh  a, [rLY]
+	cp   SCRN_Y
+	jr   c, .waitVBlank
+
+GymMenuPaint::
+	ld   de, MENU_ROW0
+	ld   b, 0
+
+.nextRow:
+	ld   a, [wGymMode]
+	cp   b
+	ld   a, MENU_CURSOR
+	jr   z, .putCursor
+	ld   a, TILE_BLANK
+.putCursor:
+	ld   h, d
+	ld   l, e
+	ld   [hl], a
+
+; the value, if the row has one
+	ld   a, b
+	cp   MODE_TRANSITION
+	call z, GymMenuPaintLevel
+	ld   a, b
+	cp   MODE_SEED
+	call z, GymMenuPaintSeed
+	ld   a, b
+	cp   MODE_MUSIC
+	call z, GymMenuPaintMusic
+
+	ld   hl, MENU_STRIDE
+	add  hl, de
+	ld   d, h
+	ld   e, l
+	inc  b
+	ld   a, b
+	cp   MODE_COUNT
+	jr   c, .nextRow
+	ret
+
+
+; DE = row base. Returns HL at the row's value column.
+GymMenuValueCell::
+	ld   hl, MENU_VALUE_COL
+	add  hl, de
+	ret
+
+
+; 0-9 then A-M: the font puts those tiles at $00-$16, so the tile is the level.
+GymMenuPaintLevel::
+	call GymMenuValueCell
+	ld   a, [wGymDrillLevel]
+	ld   [hl], a
+	ret
+
+
+; Four hex digits; the tile is the nibble. The digit being edited blinks.
+GymMenuPaintSeed::
+	call GymMenuValueCell
+	push de
+	ld   d, h
+	ld   e, l
+	ld   c, 0
+.digit:
+	push de
+	call GymReadSeedNibble
+	push af
+	ld   a, [wGymSeedDigit]
+	cp   c
+	jr   nz, .draw
+	ld   a, [wGymBlinkTimer]
+	and  $10
+	jr   nz, .draw
+	pop  af
+	ld   a, TILE_BLANK
+	jr   .store
+.draw:
+	pop  af
+.store:
+	pop  de
+	ld   h, d
+	ld   l, e
+	ld   [hl], a
+	inc  de
+	inc  c
+	ld   a, c
+	cp   4
+	jr   c, .digit
+	pop  de
+	ret
+
+
+; The music letter. OFF is drawn as a dash.
+GymMenuPaintMusic::
+	call GymMenuValueCell
+	ldh  a, [hMusicType]
+	cp   MUSIC_TYPE_OFF
+	ld   a, $25                     ; "-"
+	jr   z, .put
+	ldh  a, [hMusicType]
+	sub  MUSIC_TYPES_START
+	add  $0a                        ; "A"
+.put:
+	ld   [hl], a
 	ret
 
 
@@ -897,75 +1045,6 @@ GymMenuPutString::
 	jr   GymMenuPutString
 
 
-GymMenuPaintRows::
-	ld   de, MENU_ROW0
-	ld   hl, GymMenuLabels          ; walks forward one label per row
-	ld   b, 0
-
-.nextRow:
-; the cursor cell, at the start of the row
-	push hl
-	ld   a, [wGymMode]
-	cp   b
-	ld   a, MENU_CURSOR
-	jr   z, .putCursor
-	ld   a, TILE_BLANK
-.putCursor:
-	ld   h, d
-	ld   l, e
-	ld   [hl], a
-	pop  hl
-
-; the label, two cells in. PutString leaves hl past the terminator, which is
-; the next row's label.
-	push de
-	ld   a, e
-	add  MENU_TEXT_COL
-	ld   e, a
-	jr   nc, .noCarry
-	inc  d
-.noCarry:
-	call GymMenuPutString
-	pop  de
-
-	ld   a, b
-	cp   MODE_MUSIC
-	call z, GymMenuPaintMusic
-
-; next row
-	push hl
-	ld   hl, MENU_STRIDE
-	add  hl, de
-	ld   d, h
-	ld   e, l
-	pop  hl
-	inc  b
-	ld   a, b
-	cp   MODE_COUNT
-	jr   c, .nextRow
-	ret
-
-
-; The music letter, right of its label. OFF is drawn as a dash.
-GymMenuPaintMusic::
-	push hl
-	push de
-	ld   hl, MENU_TEXT_COL + 8
-	add  hl, de
-	ldh  a, [hMusicType]
-	cp   MUSIC_TYPE_OFF
-	ld   a, $25                     ; "-"
-	jr   z, .put
-	ldh  a, [hMusicType]
-	sub  MUSIC_TYPES_START
-	add  $0a                        ; "A"
-.put:
-	ld   [hl], a
-	pop  de
-	pop  hl
-	ret
-
-
 PUSHC
 SETCHARMAP gymfont
 GymMenuTitle::
@@ -976,6 +1055,7 @@ GymMenuLabels::
 	db "TETRIS", 0
 	db "B-TYPE", 0
 	db "TRANSITION", 0
+	db "SEED", 0
 	db "MUSIC", 0
 POPC
 
@@ -1054,6 +1134,15 @@ GymDrillApply::
 
 ; Repaint the readout: the original only redraws it on a line clear, so without
 ; this the game shows 000 until the first one.
+;
+; In VBlank. DisplayBCDNum2CDigits writes the tilemap with a bare `ld [hl+], a`,
+; because the original only ever calls it with the LCD idle - do it anywhere
+; else and the hardware drops whichever writes land mid-scanline.
+.waitVBlank:
+	ldh  a, [rLY]
+	cp   SCRN_Y
+	jr   c, .waitVBlank
+
 	ld   hl, _SCRN0 + $14e
 	ld   de, hNumLinesCompletedBCD + 1
 	ld   c, 2

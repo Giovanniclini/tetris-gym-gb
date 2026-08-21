@@ -85,12 +85,11 @@ Everything the original does still works. What the Gym adds:
 | Gym menu | `Up` / `Down` | move between rows |
 | Gym menu | `Left` / `Right` | change the value on the row |
 | Gym menu | `Start` or `A` | launch the mode |
+| Gym menu, `SEED` | `A` | open the digits, and close them again |
+| `SEED` digits | `Left` / `Right` | pick a digit · `Up` / `Down` change it |
 | Level select, grid cell `9` | `Right` | into the level picker |
 | Level picker | `Up` / `Down` | choose `0`–`9` then `A`–`M` (`A` = 10, `M` = 22) |
 | Level picker | `Left` | back to the grid |
-| Level picker | `Right` | on to the seed |
-| Seed digits | `Up` / `Down` | change a hex digit |
-| Seed digits | `Left` / `Right` | move between the four digits; `Left` off the first goes back |
 | Level select | `Select` | toggle hearts (+10 speed), shown beside `LEVEL` |
 | Any time in a game | `A`+`B`+`Select`+`Start` | restart the same drill instantly |
 
@@ -110,9 +109,9 @@ Hearts are unavailable above level 20: the original computes heart speed as
 | **Level select to M** | Levels `0-9` and `A-M` from a picker beside the original grid — `Right` off cell 9 to reach it, `Up`/`Down` to choose. `M` is one row per frame, the engine's ceiling |
 | **Hearts on Select** | The hidden `Down`+`Start` combination, made visible, with an indicator |
 | **Instant restart** | `A+B+Select+Start` restarts the drill in ~0.15 s instead of rebooting through 15 s of logos and menus |
-| **SPS** | Four hex digits, one `Right` on from the level picker. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
-| **Gym menu** | The A-TYPE/B-TYPE screen becomes TetrisGYM's list — modes first, settings after. `Up`/`Down` to move, `Left`/`Right` to change a row's value |
-| **Transition trainer** | Start ten lines short of your level's line-up. A level 9 start transitions at 100 lines; the drill begins at 90 |
+| **SPS** | Four hex digits on the menu's `SEED` row. Same seed, same pieces — and the same pieces as the community's own seeded ROM, so seeds are shareable |
+| **Gym menu** | The A-TYPE/B-TYPE screen becomes TetrisGYM's list — `TETRIS`, `B-TYPE`, `TRANSITION`, then the `SEED` and `MUSIC` settings |
+| **Transition trainer** | Picks its own level and starts straight away. A level 9 start transitions at 100 lines; the drill begins at 90 |
 | **High scores per level** | `A-M` get their own slots, so the `TOP SCORE` panel tracks the level you are about to play |
 
 **Next**

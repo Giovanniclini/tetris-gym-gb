@@ -20,8 +20,19 @@ already "what do you want to play", and it is the only menu the game has. The
 Gym redraws its tilemap and handles its own input; the original handler never
 runs. One two-byte jump-table redirect, nothing shifts.
 
-Up/Down move, Left/Right edit the row's value, Start or A launches. `MUSIC` is a
-setting, so Start does nothing on it — the same split TetrisGYM draws.
+Rows: `TETRIS`, `B-TYPE`, `TRANSITION`, `SEED`, `MUSIC`. Up/Down move,
+Left/Right edit the row's value, Start or A launches. `SEED` and `MUSIC` are
+settings, so Start does nothing on them — the same split TetrisGYM draws.
+
+**The seed lives here, not on the level select.** It is configuration, not part
+of choosing a level, and TetrisGYM keeps it on the menu row too. The level
+select is back to a level picker and nothing else.
+
+**`SEED` borrows the D-pad.** Four digits need a cursor, so A opens the row and
+A or Start closes it; while open, Left/Right pick a digit and Up/Down change it,
+with the active one blinking. TetrisGYM leaves Up and Down free for its list
+because it scrolls under a throttle; ours does not, so the row has to be
+explicitly entered.
 
 **ADR 0003 still stands.** It rejected a menu *for the level picker*, which
 belongs on the level select. This is a different screen and a different job:
@@ -45,6 +56,11 @@ scope by decision (CLAUDE.md §12).
 Chosen by community evidence — §6.2 ranks it third behind SPS and the level
 select, both already done, and it is the one thing a practitioner named
 unprompted as *"the most annoying thing"* in their routine.
+
+**`TRANSITION` carries its own level and starts the game directly**, with no
+level select in between — a drill you set up once and repeat, which is the whole
+point of it. Instant restart then re-runs the same drill for free, because the
+mode is still selected.
 
 `transitionModeSetup` (`src/gamemodestate/initstate.asm`) fills the line counter
 up to the last ten-line boundary before the level advances. The Game Boy's
@@ -73,3 +89,11 @@ puts it.
   original does for every screen change. No VBlank cost.
 * **The line readout must be repainted by hand.** The original only redraws it
   on a line clear, so a drill would otherwise show `000` until the first one.
+* **Everything the Gym paints with the LCD on happens in VBlank.** The hardware
+  drops tilemap writes made while a line is being drawn, and the original's
+  helpers do not guard against it — `DisplayBCDNum2CDigits` writes with a bare
+  `ld [hl+], a` because it is only ever called with the LCD idle. Ignoring that
+  cost us two bugs that looked unrelated: a menu cursor that vanished at random,
+  and a line count that read `0`, `10` or `20` instead of `90`. **PyBoy does not
+  enforce VRAM blocking, so neither showed up in the tests** - only on hardware
+  timing in mGBA.

@@ -29,7 +29,7 @@ LINES_LO, LINES_HI = hNumLinesCompletedBCD, hNumLinesCompletedBCD + 1
 GAME_TYPE_A, GAME_TYPE_B = 0x37, 0x77
 MUSIC_A, MUSIC_OFF = 0x1C, 0x1F
 
-MODE_TETRIS, MODE_BTYPE, MODE_TRANSITION, MODE_MUSIC = 0, 1, 2, 3
+MODE_TETRIS, MODE_BTYPE, MODE_TRANSITION, MODE_SEED, MODE_MUSIC = 0, 1, 2, 3, 4
 
 wGymMode = sym("wGymMode")
 
@@ -77,7 +77,7 @@ def test_the_menu_replaces_the_game_type_screen():
         to_menu(t)
         rows = [text(t, r) for r in range(18)]
         joined = "\n".join(rows)
-        for want in ("TETRIS GYM", "TETRIS", "B-TYPE", "TRANSITION", "MUSIC"):
+        for want in ("TETRIS GYM", "TETRIS", "B-TYPE", "TRANSITION", "SEED", "MUSIC"):
             assert want in joined, f"{want!r} missing from the menu:\n{joined}"
         assert "A-TYPE" not in joined, "the original screen is still showing"
 
@@ -108,6 +108,20 @@ def test_b_type_launches_the_b_type_level_select():
         assert t[hGameType] == GAME_TYPE_B, f"game type is ${t[hGameType]:02X}"
 
 
+def test_the_seed_row_opens_its_digits_with_a():
+    with Tetris(ROM) as t:
+        to_menu_row(t, MODE_SEED)
+        idle = t[sym("wGymSeedDigit")]
+        assert idle == 0xFF, f"should start closed, got {idle}"
+        t.press("a")
+        assert t[sym("wGymSeedDigit")] == 0, "A should open the first digit"
+        t.press("right")
+        assert t[sym("wGymSeedDigit")] == 1, "Right should step to the next digit"
+        t.press("a")
+        assert t[sym("wGymSeedDigit")] == 0xFF, "A should close the digits"
+        assert t.state == GS_GAME_TYPE_MAIN, "A on a setting started something"
+
+
 def test_music_is_a_setting_not_a_mode():
     """TetrisGYM splits its list at MODE_GAME_QUANTITY: rows past it configure
     the game rather than starting one. Start must do nothing here."""
@@ -128,14 +142,16 @@ def test_music_is_a_setting_not_a_mode():
 
 
 def _run_drill(t, level):
+    """The row carries its own level and starts the game directly - a drill you
+    set up once and repeat, with no level select in between."""
     to_menu_row(t, MODE_TRANSITION)
-    t.press("start")
-    t.run_until_state(GS_A_TYPE_SELECTION_MAIN)
-    t.tick(6)
-    t.pb.memory[hATypeLevel] = level
+    for _ in range(level):
+        t.press("right")
+    assert t[sym("wGymDrillLevel")] == level, "the row did not take the level"
     t.press("start")
     t.run_until_state(GS_IN_GAME_MAIN)
-    t.tick(20)
+    t.tick(25)
+    assert t[hATypeLevel] == level, f"started on level {t[hATypeLevel]}"
     return int(f"{t[LINES_HI]:02X}{t[LINES_LO]:02X}")   # BCD -> decimal
 
 
