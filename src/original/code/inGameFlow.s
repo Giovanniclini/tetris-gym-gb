@@ -1047,19 +1047,27 @@ CheckIfATypeNextLevelReached:
     ld   hl, hATypeLinesThresholdToPassForNextLevel              ; $2454
     ld   a, [hl]                                                 ; $2457
 ; --- tetris-gym-gb deviation #4 (see src/original/UPSTREAM.md) ---
-; Stock caps at $14 (level 20), which is correct when 20 is the highest level.
-; With L and M selectable the cap must rise, or levelling up from an L start
-; runs past the end of the gravity table and into code. KLM has this bug: it
-; adds L and M but leaves the cap at $14, so level 23 would read $C9 as its
-; gravity (202 frames/row). Latent in practice - an L start needs ~220 lines
-; to level up - but wrong.
+; Stock stops levelling only on *equality* with $14, which is correct when 20 is
+; the highest level there is. Once L and M are selectable it is not: a level 21
+; start never equals 20, so it keeps climbing and the gravity lookup runs past
+; the end of the table into code.
+;
+; `ret nc` instead of `ret z` - stop at 20 *or above*. Identical for every level
+; the original can reach, and it means an L or M start never transitions, which
+; is what players expect of a speed drill.
+;
+; This is exactly what KLM does, at its own $244D: `cp $14 / ret nc`, one byte
+; different from stock. Our first reading of KLM matched the `cp $14` and
+; assumed the `ret z` after it, and so reported a bug KLM does not have. Tolstoj
+; said he thought he had fixed it; he had. See docs/existing-hacks.md 3.2.
 IF GYM
-    cp   MAX_LEVEL                  ; $16 = M
+    cp   $14
+    ret  nc
 ELSE
     cp   $14                                                     ; $2458
+    ret  z                                                       ; $245a
 ENDC
 ; --- end deviation #4 ---
-    ret  z                                                       ; $245a
 
 ; a and b is level
     call ABisBCDofValInHL                                        ; $245b

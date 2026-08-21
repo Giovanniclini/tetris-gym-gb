@@ -37,7 +37,7 @@ ALLOWED_RANGES = [
     (0x2043, 0x2045, "HOOK_RNG_PIECE - piece generator draw routed via GymRandom"),
     (0x7FC6, 0x7FEF, "GYM_RANDOM - the LFSR, in bank 1's empty space"),
     (0x1AFB, 0x1AFC, "HOOK_GRAVITY_PTR - table pointer redirected to GymFramesData"),
-    (0x2459, 0x2459, "HOOK_LEVEL_CAP - level-up cap raised from $14 to $16"),
+    (0x245A, 0x245A, "HOOK_LEVEL_CAP - `ret z` -> `ret nc`, so L and M never transition"),
     (0x0147, 0x0147, "cartridge type -> MBC1+RAM+BATTERY"),
     (0x0148, 0x0148, "ROM size -> 64KB"),
     (0x0149, 0x0149, "RAM size -> 8KB"),
@@ -90,14 +90,20 @@ def test_trampoline_fits_its_declared_padding():
     assert used <= 38, f"trampoline uses {used} of 38 available bytes"
 
 
-def test_level_cap_raised_for_l_and_m():
-    """docs/existing-hacks.md 3.2: with L and M selectable the level-up cap
-    must rise, or levelling up runs past the gravity table into code. KLM has
-    this bug; measured, its level 23 loads 202 frames/row."""
+def test_level_cap_stops_at_twenty_or_above():
+    """docs/existing-hacks.md 3.2. Stock stops levelling only on *equality* with
+    $14, which is fine when 20 is the highest level there is. With L and M
+    selectable it is not: 21 never equals 20, so it keeps climbing off the end
+    of the gravity table into code.
+
+    `ret nc` instead of `ret z` - identical for every level the original can
+    reach, and an L or M start never transitions. This is what KLM does too, one
+    byte different from stock; our first reading of KLM missed it."""
     ref, gym = _build("--original"), _build()
-    assert ref[0x2459] == 0x14, "stock cap should be $14 (level 20)"
-    assert gym[0x2459] == 0x16, f"Gym cap should be $16 (level 22), got ${gym[0x2459]:02X}"
-    assert gym[0x2458] == 0xFE, "expected `cp n8` opcode at $2458"
+    assert ref[0x2458:0x245B] == bytes((0xFE, 0x14, 0xC8)), "stock: cp $14 / ret z"
+    assert gym[0x2458:0x245B] == bytes((0xFE, 0x14, 0xD0)), (
+        f"Gym should be cp $14 / ret nc, got {gym[0x2458:0x245B].hex(' ')}"
+    )
 
 
 def test_extended_gravity_table_contents():

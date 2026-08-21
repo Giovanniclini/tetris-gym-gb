@@ -55,9 +55,13 @@
 ;                                            of every game - including an
 ;                                            instant restart, which must repeat
 ;                                            the sequence rather than continue.
-;   HOOK_LEVEL_CAP    $2459               1  Operand of `cp $14`, raised to $16
-;                                            so levelling up from an L or M
-;                                            start cannot run past the table.
+;   HOOK_LEVEL_CAP    $245A               1  `ret z` becomes `ret nc`, so
+;                                            levelling stops at 20 *or above*
+;                                            rather than only on equality with
+;                                            it. Identical for every level the
+;                                            original can reach; an L or M start
+;                                            never transitions. KLM makes the
+;                                            same one-byte change.
 ;   HOOK_STATE_TABLE00 $02FB-$02FC       2  Jump-table entry for $00, the
 ;                                            per-frame gameplay state. The one
 ;                                            hook trainers act from while a game

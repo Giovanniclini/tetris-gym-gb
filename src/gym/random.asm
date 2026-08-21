@@ -7,8 +7,12 @@
 ;
 ; The LFSR below is NOT ours. It is transcribed byte for byte from the seeded
 ; ROM already circulating in the GBTetris community (docs/existing-hacks.md
-; section 4), whose authors we have not been able to name - if you wrote it,
-; please tell us so we can credit you.
+; section 4). Ospin found it - it comes from the public literature rather than
+; being anyone's invention - and Tolstoj confirmed its provenance.
+;
+; It is 16-bit, and the community is moving to 24 bits: Toni is building that,
+; and Tolstoj's guidance is to adopt it rather than keep this. Nobody uses the
+; four-digit seeds, so there is no compatibility to preserve.
 ;
 ; That it is theirs is the point: for a fairness mechanism, interoperability
 ; *is* the feature. A given seed must produce the same pieces on our ROM as on

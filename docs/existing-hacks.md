@@ -66,44 +66,42 @@ This confirms the community's own figures exactly: M-J's *"L is 2 frames/row com
 3"*, and *"26400 for tetris"* on L, which is `(21 + 1) × 1200` — the score multiplier extends
 naturally with no table change.
 
-### 3.2 A bug: the level-up cap was not raised
+### 3.2 ~~A bug: the level-up cap was not raised~~ — WRONG, retracted
 
-**[VERIFIED EMPIRICALLY 2026-08-20 — reproduced in an emulator, not inferred]**
+**[RETRACTED 2026-08-21. KLM does not have this bug. The claim was published in
+the v0.1.0 and v0.2.0 release notes and reported to Tolstoj; both are corrected.]**
 
-KLM extends the gravity table to 23 entries but **leaves the level-up cap at `$14` (level 20)**.
-The check is byte-identical to stock:
+The original stops levelling only on *equality* with `$14`:
 
 ```asm
-    ld   hl, hATypeLinesThresholdToPassForNextLevel   ; $FFA9 holds the level
-    ld   a, [hl]
-    cp   $14              ; stock $2458 / KLM $2449 - unchanged
-    ret  z                ; stop levelling only when the level is exactly 20
+    cp   $14
+    ret  z            ; stock $2458-$245A:  fe 14 c8
 ```
 
-It stops only on **exact equality with 20**. Start on L (21) or M (22) and the level never equals
-20, so it keeps incrementing — 23, 24, 25 — and the gravity lookup indexes past the end of the
-table into the code that follows it.
+**KLM changes one byte:**
 
-Measured by running the real KLM ROM in an emulator and reading the gravity value the game loads:
+```asm
+    cp   $14
+    ret  nc           ; KLM  $244D-$244F:   fe 14 d0
+```
 
-| Level | Display | Frames/row | |
-| --- | --- | --- | --- |
-| 20 | `K` | 3 | |
-| 21 | `L` | 2 | |
-| 22 | `M` | 1 | last real entry |
-| **23** | `N` | **202** | reads `$C9` — *slower than level 0* |
-| **24** | `O` | **63** | reads `$3E` |
-| **25** | `P` | **2** | reads `$01` |
+`ret nc` returns at 20 *or above*, so an L or M start never transitions. The fix
+is correct and complete.
 
-**Practical impact: low but real.** Reaching it needs a level-up from an L or M start, which takes
-roughly 220 line clears at 2 frames per row — nobody has come close. But the failure is silent and
-absurd when it happens: the game would abruptly become slower than level 0, then jump around.
+**How this was got wrong.** The analysis searched for `cp $14`, found it
+unchanged at KLM's relocated address, and concluded the cap had not been raised
+— without checking the instruction after it. The measurement said to be
+"verified empirically" measured our own build's behaviour, not KLM's.
+Tolstoj: *"the latest implementation should not transition from L… I thought I
+fixed it"*. He had.
 
-**Our fix** (`src/original/UPSTREAM.md` deviation #4) raises the cap to `MAX_LEVEL` (`$16` = 22), a
-one-byte change. Capping the *source* is the right fix; padding the table would only move the cliff.
+**What to take from it:** a one-byte difference inverted the conclusion, and the
+byte was one instruction past where the analysis stopped looking. Reading the
+operand is not reading the instruction.
 
-**This is worth reporting upstream.** It is a concrete, reproducible finding, and offering it costs
-nothing.
+The Gym now makes the same change (`HOOK_LEVEL_CAP`), because it is better than
+what we had: our own version compared against `MAX_LEVEL` and stopped only on
+equality with 22, so L still climbed to M.
 
 ### 3.2b A second bug: hearts make K, L and M *slower*
 
@@ -130,7 +128,8 @@ Once L (21) and M (22) exist, `level + 10` overflows the ceiling and the clamp p
 | **L (21)** | **2** | **3** | **hearts are slower** |
 | **M (22)** | **1** | **3** | **hearts are three times slower** |
 
-KLM's copy of this routine is byte-identical to stock apart from the table pointer, so **KLM has
+KLM's copy of this routine is byte-identical to stock apart from the table pointer — re-verified
+2026-08-21, `3e 0a 83 fe 15 38 02 3e 14` in both — so **KLM has
 this too**. Unlike the level-cap bug in §3.2 it is trivially reachable: arm hearts on the title
 screen, pick M.
 
