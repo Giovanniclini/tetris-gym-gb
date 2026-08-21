@@ -2,8 +2,11 @@
 ;
 ; Each entry is (frames per row - 1); the game reloads the gravity counter with
 ; the stored value and counts down. Levels 0-20 are byte-identical to the
-; original. L and M match the community's KLM romhack exactly, verified by
-; reverse engineering it - see docs/existing-hacks.md section 3.
+; original. L and M are not our invention: they match the community's KLM
+; romhack - Ospin, Tolstoj, Pascal and Hepps in lineage - exactly, verified by
+; reverse engineering it (docs/existing-hacks.md section 3). A practice level
+; has to mean the same thing on both ROMs or the numbers players quote each
+; other stop being comparable.
 ;
 ; M ($00 = one row per frame) is the hard ceiling of the mechanism, not an
 ; arbitrary stop: the counter cannot reload with less than one frame.

@@ -5,11 +5,15 @@
 ; loop, the bitwise-OR rejection test, the resulting 10.7/13.7/16.1% bias - is
 ; left exactly as it was. Only the entropy source changes.
 ;
-; The LFSR below is transcribed byte for byte from the community's unfinished
-; seeded ROM (docs/existing-hacks.md section 4). That is deliberate: for a
-; fairness mechanism, interoperability *is* the feature. A given seed must
-; produce the same pieces on our ROM as on theirs, so an objectively better
-; generator producing different sequences would be worse.
+; The LFSR below is NOT ours. It is transcribed byte for byte from the seeded
+; ROM already circulating in the GBTetris community (docs/existing-hacks.md
+; section 4), whose authors we have not been able to name - if you wrote it,
+; please tell us so we can credit you.
+;
+; That it is theirs is the point: for a fairness mechanism, interoperability
+; *is* the feature. A given seed must produce the same pieces on our ROM as on
+; theirs, so an objectively better generator producing different sequences would
+; be worse.
 ;
 ; Lives in the 42 bytes of empty space between the sound engine and the sound
 ; thunks in bank 1, so it needs no room in bank 0 and shifts nothing. Bank 1 is

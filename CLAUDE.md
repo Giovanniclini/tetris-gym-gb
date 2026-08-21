@@ -137,6 +137,17 @@ no `make`, no `gcc`, no package manager, no global installs. RGBDS is downloaded
 If you believe a system-wide dependency is genuinely required, **ask first** and explain why the
 vendored approach cannot work.
 
+### 10a. Credit the community's work, and ask before taking more
+
+Two things in this ROM are not ours: the **LFSR** is transcribed byte for byte from the
+community's seeded ROM, and the **L/M gravity values** match KLM by reverse engineering. Both are
+deliberate — interoperability is the point — and both must stay credited in `README.md` §Credits
+and in the source that uses them.
+
+**ROMs shared privately are shared privately.** Do not redistribute them, do not commit them, and
+do not lift code from them without asking the person who sent them. *"It's more than likely ok, but
+I am a person that needs this"* — Tolstoj, 2026-08-21. Ask first; name people after.
+
 ### 10. Never distribute ROM data
 
 The Game Boy Tetris ROM is copyrighted. Releases contain a **BPS patch only**. Never commit a
