@@ -14,9 +14,9 @@ current.
 | 4 — Replay, tooling and polish | not started |
 | 5 — Hardware validation and 1.0 | not started |
 
-**Released:** `v0.2.0`, 2026-08-21 — the Lab menu and the first trainer.
-Still an alpha, and still ahead of the Milestone 2 gate below. BPS patch on
-[Releases](https://github.com/Giovanniclini/tetris-lab-gb/releases).
+**Released:** `v0.3.0`, 2026-08-22 — the rename, and everything the community
+reported. Still an alpha, and still ahead of the Milestone 2 gate below. BPS
+patch on [Releases](https://github.com/Giovanniclini/tetris-lab-gb/releases).
 
 Outstanding across finished milestones:
 
