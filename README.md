@@ -116,6 +116,10 @@ indicator beside `LEVEL`. They add ten levels of speed, and are withheld above l
 the original computes them as `min(level + 10, 20)`, which past 20 clamps *downward* and would
 make the game slower.
 
+The score no longer stops at 999,999 — it runs to 9,999,999. The original pins it there because three BCD bytes hold six
+digits; a seventh is kept alongside and drawn into the panel's left edge, which is where the room
+is. Seven digits is all the panel has room for — the spare cell to the right of the score — so it pins there rather than counting into a digit it cannot show. High score entries are still six digits.
+
 Holding `Down` does nothing at `L` and `M`. Pushdown moves a piece every 3 frames whatever the
 level, and those two fall in 2 and 1 — so it would make them *slower*. No push, so no drop points
 there either.

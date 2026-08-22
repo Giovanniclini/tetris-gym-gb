@@ -891,7 +891,17 @@ CopyRamBufferRow2ToVram:
     call CopyRamBufferRowToVram                                  ; $23a9
 
 ; update score in screen 1
+; --- tetris-lab-gb deviation #20 (see src/original/UPSTREAM.md) ---
+; The score is drawn one cell right, so its units digit sits in the spare cell
+; at column 19 instead of leaving it blank. That frees column 13 for the seventh
+; digit, and means the number does not shift sideways when it passes a million.
+; One byte of the operand, at each of the four places the score is drawn.
+IF LAB
+    ld   hl, _SCRN1+$6e
+ELSE
     ld   hl, _SCRN1+$6d                                          ; $23ac
+ENDC
+; --- end deviation #20 ---
     call DisplayGameATypeScoreIfInGameAndForced                  ; $23af
     ld   a, $01                                                  ; $23b2
     ldh  [hFoundDisplayableScoreDigit], a                        ; $23b4
@@ -908,7 +918,17 @@ CopyRamBufferRow1ToVram:
     call CopyRamBufferRowToVram                                  ; $23c2
 
 ; update score in screen 0
+; --- tetris-lab-gb deviation #20 (see src/original/UPSTREAM.md) ---
+; The score is drawn one cell right, so its units digit sits in the spare cell
+; at column 19 instead of leaving it blank. That frees column 13 for the seventh
+; digit, and means the number does not shift sideways when it passes a million.
+; One byte of the operand, at each of the four places the score is drawn.
+IF LAB
+    ld   hl, _SCRN0+$6e
+ELSE
     ld   hl, _SCRN0+$6d                                          ; $23c5
+ENDC
+; --- end deviation #20 ---
     call DisplayGameATypeScoreIfInGameAndForced                  ; $23c8
     ret                                                          ; $23cb
 

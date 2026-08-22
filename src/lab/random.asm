@@ -87,9 +87,71 @@ LabRandom::
 ; table. A new section in a hole, not an insertion.
 ; ---------------------------------------------------------------------------
 
-SECTION "Lab Bank 1 Thunk", ROMX[$6430], BANK[1]
+; Two gaps, because neither is big enough alone: 32 bytes here and 10 at the
+; very end of the bank, past the sound thunks.
+
+SECTION "Lab Bank 1 Gfx Thunk", ROMX[$7FF6], BANK[1]
 
 LabLoadMenuGfx::
 	call TurnOffLCD
 	call LoadAsciiAndMenuScreenGfx
+	ret
+
+
+SECTION "Lab Bank 1 Thunk", ROMX[$6430], BANK[1]
+
+
+; ---------------------------------------------------------------------------
+; Score uncap
+;
+; The original stops the score at 999 999 by pinning all three BCD bytes to $99
+; when the add carries out of the top one ($0178). That is the ceiling of the
+; storage, not a rule: three BCD bytes hold six digits and the clamp exists to
+; stop them wrapping to zero.
+;
+; The clamp is replaced by a jump here. By this point the add has already
+; wrapped the three bytes to the low six digits, so all that is missing is the
+; carry - one more BCD byte, giving digits 7 and 8.
+;
+; AddScoreValueDEontoBaseScoreHL is generic: it adds into whatever HL points at,
+; from five different call sites. Only the live score gets a carry digit, so the
+; pointer is checked first.
+;
+; In bank 1 because the clamp is reached during gameplay, when bank 2 is not
+; mapped.
+; ---------------------------------------------------------------------------
+
+; A and the flags are not preserved: the clamp this replaces ended with $99 in A,
+; so no caller can have relied on either.
+LabScoreCarry::
+	ld   a, h
+	cp   HIGH(wScoreBCD + 2)
+	jr   nz, .notTheLiveScore
+	ld   a, l
+	cp   LOW(wScoreBCD + 2)
+	jr   nz, .notTheLiveScore
+
+; Stop at 9, so the ceiling is 9 999 999. There is no room on screen for an
+; eighth digit - column 11 is inside the playfield - so counting past 9 would
+; only make the display lie, which is worse than a ceiling ten times the
+; original's. Toni's build adds digits 7 and 8; when we take his format this
+; comes back.
+	ld   a, [wLabScoreMillions]
+	cp   $09
+	jr   z, .ceiling
+	add  $01
+	daa
+	ld   [wLabScoreMillions], a
+
+.notTheLiveScore:
+	ret
+
+; At the ceiling, pin every digit the way the original pinned its six. Simply
+; refusing the carry is not enough: the add has already wrapped the low six, so
+; the score would fall from 9 999 950 to 9 000 350.
+.ceiling:
+	ld   a, $99
+	ld   [hl-], a
+	ld   [hl-], a
+	ld   [hl], a
 	ret
