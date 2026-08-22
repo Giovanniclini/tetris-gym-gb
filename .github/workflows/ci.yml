@@ -63,6 +63,7 @@ jobs:
           python3 tests/test_sps.py
           python3 tests/test_labmenu.py
           python3 tests/test_link.py
+          python3 tests/test_hiscore.py
 
       # Patches only, never ROM data. See docs/research.md section 7.
       - name: Assert no ROM data is tracked

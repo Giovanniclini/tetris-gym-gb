@@ -202,7 +202,10 @@ TetrisGYM's list, and carries the first trainer — TRANSITION
 
 **Status 2026-08-22:** the score passes 999 999 — the clamp is a carry handler
 now, and a seventh digit is drawn into the panel's left edge. High score entries
-are still six digits; that needs its own change.
+carry it too, in the dotted gap between the name and the score, and rank by it:
+the original compares three bytes, so 1 000 050 stored as 000050 would have lost
+to 999 999. Only the comparison is ours — the shift, the name and the display
+stay the original's. No new hooks.
 
 **Status 2026-08-22:** pushdown no longer applies at L and M, where it made the
 piece slower rather than faster. Reported by Tolstoj; the drop points go with
