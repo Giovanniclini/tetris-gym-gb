@@ -200,6 +200,10 @@ filed and shown under the level it was played at (`docs/decisions/0006`).
 TetrisGYM's list, and carries the first trainer — TRANSITION
 (`docs/decisions/0007`).
 
+**Status 2026-08-22:** pushdown no longer applies at L and M, where it made the
+piece slower rather than faster. Reported by Tolstoj; the drop points go with
+it, by Giovanni's call — no push, nothing to reward.
+
 Work follows the revised list in `docs/community-research.md` §6.2:
 
 1. **SPS — standardised same piece sequence** (§6.2 #1). *The headline feature.* Design is now
