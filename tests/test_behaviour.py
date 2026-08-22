@@ -148,6 +148,29 @@ def test_pushdown_does_nothing_at_l_and_m():
         assert score == 0, f"level {level} still awarded {score} drop points"
 
 
+def test_the_real_button_state_is_kept_when_down_is_suppressed():
+    """Suppressing pushdown works by editing the controller state the game
+    reads, so from that point what the game sees is a lie. Anything that wants
+    to *show* the input - toni asked for an input display - has to read the
+    unedited copy the Gym keeps."""
+    from tools.emu import sym
+    hButtonsHeld = 0xFF80
+    wGymButtonsHeld = sym("wGymButtonsHeld")
+
+    for level, game_should_see_down in ((9, True), (22, False)):
+        with Tetris("build/tetrisgym.gb") as t:
+            t.start_game_at(level)
+            t.tick(60)
+            t.pb.button_press("down")
+            t.tick(20)
+            seen = bool(t[hButtonsHeld] & 0x80)
+            stashed = bool(t[wGymButtonsHeld] & 0x80)
+            assert seen == game_should_see_down, (
+                f"level {level}: game sees Down={seen}, expected {game_should_see_down}"
+            )
+            assert stashed, f"level {level}: the Gym lost the real button state"
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":

@@ -104,7 +104,13 @@ wGymDrillPending:: db       ; set at game init, consumed on the first game frame
 wGymDrillLevel::  db        ; the level the TRANSITION row is set to
 wGymSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
 
-	ds 1009
+; The controller as the player actually held it, before GymSuppressPushdown
+; edits it. Anything that wants to *show* the input - toni asked for an input
+; display - must read this, not the HRAM the game reads.
+wGymButtonsHeld::    db
+wGymButtonsPressed:: db
+
+	ds 1007
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -1372,6 +1378,15 @@ GymDrillDigit:
 ; ---------------------------------------------------------------------------
 
 GymSuppressPushdown::
+; Keep the real thing first, every frame, whether or not it gets edited. What
+; the game reads is a lie from here on, and something will eventually want the
+; truth - toni has already asked for an input display, which at L and M would
+; otherwise show Down as unpressed while the player leans on it.
+	ldh  a, [hButtonsHeld]
+	ld   [wGymButtonsHeld], a
+	ldh  a, [hButtonsPressed]
+	ld   [wGymButtonsPressed], a
+
 	ldh  a, [hNumFramesUntilPiecesMoveDown]
 	cp   2                          ; stored as frames-1, so < 2 means under 3
 	ret  nc
