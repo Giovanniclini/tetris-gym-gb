@@ -273,6 +273,28 @@ def test_b_type_launches_the_b_type_level_select():
         assert t[hGameType] == GAME_TYPE_B, f"game type is ${t[hGameType]:02X}"
 
 
+def test_b_type_is_untouched_by_the_score_uncap():
+    """The uncap follows the original's own structure rather than inventing a
+    limit: the original displays a score in A-type only ($243F), so the seventh
+    digit does too. B-type is 25 lines and tops out near 100 000, so it has no
+    seventh digit to show and no cell of ours to keep clear."""
+    with Tetris(ROM) as t:
+        to_menu_row(t, MODE_BTYPE)
+        t.press("start")
+        t.run_until_state(GS_B_TYPE_SELECTION_MAIN)
+        t.press("start")
+        t.run_until_state(0x00)
+        t.tick(120)
+        t.pb.memory[sym("wLabScoreMillions")] = 9     # as if it had carried
+        t.tick(60)
+        for cell in (13, 19):
+            tile = t[0x9800 + 3 * 32 + cell]
+            assert tile > 9, (
+                f"column {cell} shows digit {tile} in B-type, where the original "
+                f"draws no score at all"
+            )
+
+
 def test_the_seed_row_opens_its_digits_with_a():
     with Tetris(ROM) as t:
         to_menu_row(t, MODE_SEED)
