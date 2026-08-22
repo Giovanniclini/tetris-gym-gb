@@ -27,7 +27,7 @@ of the combination is what makes almost all of them necessary.
    Hooking MainLoop alone does nothing: this one reaches `Reset` first.
 2. **`MainLoop` (`$02D3`)** - runs every frame regardless of state. The in-game
    check goes quiet during the restart's own init frames, so this one would
-   reboot us a moment later. Hooked with `call` rather than `jp` so the Gym can
+   reboot us a moment later. Hooked with `call` rather than `jp` so the Lab can
    decline and let the loop carry on.
 3. **Jump-table entries for the screens that consume Start themselves** - `$04`
    end-of-game and `$15` name entry. Both treat Start as "move on", and Start is
@@ -39,8 +39,8 @@ of the combination is what makes almost all of them necessary.
 
 ## Consequences
 
-* **A flag, not a state test, marks our restart.** `wGymRestarting` distinguishes
-  "the Gym restarted the game" from "the level select started a game", which
+* **A flag, not a state test, marks our restart.** `wLabRestarting` distinguishes
+  "the Lab restarted the game" from "the level select started a game", which
   reach the same `GS_IN_GAME_INIT`. Pressing the combination on a menu presses
   Start too, so the menu starts a game on the way past; without the flag that
   would be mistaken for a restart and the menu would stop rebooting.
@@ -57,7 +57,7 @@ of the combination is what makes almost all of them necessary.
 * **Menus reboot, and must not start a game first.** Start is part of the
   combination, so the level select would act on it, start a game, and have that
   game rebooted a frame later - visible as a flash of gameplay. The stock ROM
-  genuinely does this; the Gym suppresses Start while the combination is held,
+  genuinely does this; the Lab suppresses Start while the combination is held,
   which makes it better-behaved than the original here.
 * **You get the level you chose, not the level you reached.** `hATypeLevel`
   (`$FFC2`) holds the menu choice and is never written during play;

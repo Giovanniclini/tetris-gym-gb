@@ -86,10 +86,10 @@ picker needs none of them.
   genuinely random. That spends the degenerate all-zero LFSR state as the "off"
   value rather than leaving it as a trap, and means there is nothing to
   randomise: clearing the seed *is* randomising.
-* **No charmap is active in `src/gym/`**, so string literals assemble as ASCII.
+* **No charmap is active in `src/lab/`**, so string literals assemble as ASCII.
   Letters written to the tilemap must be explicit tile indices.
 * **The TOP SCORE panel follows the picked level.** It is driven by
-  `hATypeLevel`, which the Gym keeps as the grid index, so it used to keep
+  `hATypeLevel`, which the Lab keeps as the grid index, so it used to keep
   showing the grid cursor's scores while you had M selected. The table has ten
   slots, one per grid level; A-M have no storage, so those show the dotted
   placeholder the original already uses for empty entries.

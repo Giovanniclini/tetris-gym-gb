@@ -14,9 +14,9 @@
 ; Lives in the 29 bytes of $ff padding at $000B-$0027 so bank 0 keeps its
 ; original layout. 23 bytes used, 6 spare.
 
-INCLUDE "gym/levels.inc"
+INCLUDE "lab/levels.inc"
 
-GymFramesData::
+LabFramesData::
 	;   0    1    2    3    4    5    6    7    8    9
 	db $34, $30, $2c, $28, $24, $20, $1b, $15, $10, $0a
 	;   A    B    C    D    E    F    G    H    I    J

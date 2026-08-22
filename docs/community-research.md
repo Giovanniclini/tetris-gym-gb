@@ -270,7 +270,7 @@ a public KLM repo.
 
 **This sharpens the project's value proposition.** The community's two most-used ROMs have no public
 source, no version control, and no distribution outside one Discord channel. That is the gap, and it
-is a stronger pitch to Tolstoj than "I would like to build a gym".
+is a stronger pitch to Tolstoj than "I would like to build a lab".
 
 **Consequence for Milestone 1.** Levels 10–20 (A–K) are fully derivable from the 21-entry gravity
 table at `$1B06` in the ROM we already build byte-exactly. **L (21) and M (22) are not** — the only
@@ -350,7 +350,7 @@ one frame after the piece locks."*
 
 ### 3.5.5 Hz counter — wanted, but genuinely less central than on NES
 
-Requested (*"is there a hz counter rom like in tetris gym"* — Tale), and absent. *Tolstoj* proposed
+Requested (*"is there a hz counter rom like in tetris lab"* — Tale), and absent. *Tolstoj* proposed
 translating [TetrisGYM's `hz.asm`](https://github.com/kirjavascript/TetrisGYM/blob/master/src/modes/hz.asm)
 to GB assembly, noting the frame rates are close enough to carry over, but *"I'm honestly not super
 motivated to push it forward right now."*
@@ -392,7 +392,7 @@ small hacks *can* run on a genuine unmodified cartridge — limited to **three c
 
 This matters because the community places real weight on original hardware — *"Only (or as close as
 possible to) OG Nintendo hardware is allowed"* (Pascal, on CTWC GB rules) — and nells's **"SOG,
-Spirit Of Gameboy"** ("sogginess"). A Gym cannot fit in 3 Game Genie codes, so this is not a route
+Spirit Of Gameboy"** ("sogginess"). A Lab cannot fit in 3 Game Genie codes, so this is not a route
 for us; but we must **not claim it is impossible**, and we should expect the trade-off to be
 debated.
 
@@ -402,7 +402,7 @@ and "tourney carts". *Hepta*: cheap AliExpress flashcarts work for Tetris; EZ-Fl
 are the traditional but pricier options. **D9's premise is confirmed — the cartridge is a design
 input we can influence.**
 
-There is an unresolved legality debate in the community (*mathmaster13*: *"Gym carts are very
+There is an unresolved legality debate in the community (*mathmaster13*: *"Lab carts are very
 obviously not legal to produce imo"*; *Muf* counters that CTEC's stock of legitimate carts offsets
 it). **Stay out of it. Ship patches, never ROMs, never carts** — consistent with `docs/research.md` §7.
 
@@ -418,8 +418,8 @@ between cart and console) and [GBLink-Firmware](https://github.com/starlarkus/GB
 > same knowledge as me."* — Tolstoj, 2026-01
 
 There were also historical efforts toward a **"shiftable disassembly"** (Tolstoj, 2022) — a base
-where inserting code relocates everything cleanly — and *nitro2k01* said of a gym/trainer:
-*"For a gym/trainer, absolutely."*
+where inserting code relocates everything cleanly — and *nitro2k01* said of a lab/trainer:
+*"For a lab/trainer, absolutely."*
 
 **This is the strategic opening.** The failure Tolstoj describes — restructuring broke the
 project — is *exactly* what Milestone 0 prevents: a byte-exact reference build plus a regression
@@ -493,7 +493,7 @@ Difficulty key: **XS** trivial (one constant) · **S** small (state setup, no ne
 
 ---
 
-## 6. TOP 10 MOST VALUABLE FEATURES FOR A GAME BOY TETRIS GYM — SUPERSEDED by §6.2
+## 6. TOP 10 MOST VALUABLE FEATURES FOR A GAME BOY TETRIS LAB — SUPERSEDED by §6.2
 
 Ranked by (Game Boy) community evidence × training value × feasibility.
 
@@ -587,7 +587,7 @@ The community has effectively already written the product definition:
 | 5 | **Instant restart / zero-friction reset into the drill** | Pascal's qual-ROM design notes are explicitly built around this | Partially exists (rocket skip, straight-to-menu) |
 | 6 | **Transition trainer (the 9→10, 100-line grind)** | Named as the most annoying grind; *"closest thing we have"* workarounds discussed | **mathmaster13 is already building one — coordinate** |
 | 7 | **Hz / tap-rate counter** | Requested; absent; Tolstoj proposed porting TetrisGYM's `hz.asm` | **Does not exist.** Cap at SHOULD — §3.5.5 |
-| 8 | **Floor mode / preset boards / garbage height** | Requested in §3.4; standard Gym fare | Does not exist |
+| 8 | **Floor mode / preset boards / garbage height** | Requested in §3.4; standard Lab fare | Does not exist |
 | 9 | **Low stack** | Requested in §3.4 | Does not exist |
 | 10 | **VS-style garbage / dig practice** | The bracket format is link-cable VS | Does not exist |
 
@@ -675,7 +675,7 @@ governs order.
 ### 8.1 `A+B+Select+Start` means something different here
 
 > *"also can you made smt to get out of the game … like a+b+select+start in
-> tetrisgym"* — báovofe67 [TAWS]
+> tetrislab"* — báovofe67 [TAWS]
 
 In TetrisGYM that combination returns you to the **menu**. Here it restarts the
 current drill in place (ADR 0005), which was a deliberate choice — *"when you are
@@ -706,7 +706,7 @@ brings up a fresh game that is still flagged paused: a piece sits at the top and
 nothing moves until Start is pressed again. *"Only sometimes"* is exactly right —
 only when Start lands first.
 
-Measured before and after clearing the flag in `GymInGameReset`:
+Measured before and after clearing the flag in `LabInGameReset`:
 
 | | board cleared | `hGamePaused` after | piece |
 | --- | --- | --- | --- |

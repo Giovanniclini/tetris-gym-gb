@@ -25,13 +25,13 @@
 
 INCLUDE "include/hardware.inc"
 
-SECTION "Gym Random", ROMX[$7FC6], BANK[1]
+SECTION "Lab Random", ROMX[$7FC6], BANK[1]
 
 ; Replaces `ldh a, [rDIV] / ld b, a` at each call site - three bytes for three,
 ; so nothing moves. Returns the value in B, as those two instructions did.
 ; Preserves HL, which the piece generator uses as its retry counter.
-GymRandom::
-	ldh  a, [hGymSpsEnabled]
+LabRandom::
+	ldh  a, [hLabSpsEnabled]
 	and  a
 	jr   nz, .seeded
 
@@ -43,7 +43,7 @@ GymRandom::
 .seeded:
 	push hl
 
-	ld   hl, wGymRngLo
+	ld   hl, wLabRngLo
 	ld   a, [hl+]
 	ld   h, [hl]                    ; h = high byte
 	ld   l, a                       ; l = low byte
@@ -66,9 +66,9 @@ GymRandom::
 	ld   h, a
 
 	ld   a, h
-	ld   [wGymRngHi], a
+	ld   [wLabRngHi], a
 	ld   a, l
-	ld   [wGymRngLo], a
+	ld   [wLabRngLo], a
 
 	ld   b, a
 	pop  hl
@@ -80,16 +80,16 @@ GymRandom::
 ;
 ; LoadAsciiAndMenuScreenGfx lives in bank 0 but reads Gfx_Ascii from bank 1
 ; ($415F), so it cannot be called while bank 2 is mapped - that address holds
-; Gym code. Bank-2 code must not switch banks itself (ADR 0001), so the call
+; Lab code. Bank-2 code must not switch banks itself (ADR 0001), so the call
 ; happens from here, reached through FarCall with bank 1 selected.
 ;
 ; In the empty gap the linker reports between the demo steps and the demo piece
 ; table. A new section in a hole, not an insertion.
 ; ---------------------------------------------------------------------------
 
-SECTION "Gym Bank 1 Thunk", ROMX[$6430], BANK[1]
+SECTION "Lab Bank 1 Thunk", ROMX[$6430], BANK[1]
 
-GymLoadMenuGfx::
+LabLoadMenuGfx::
 	call TurnOffLCD
 	call LoadAsciiAndMenuScreenGfx
 	ret

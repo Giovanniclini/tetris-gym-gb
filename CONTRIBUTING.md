@@ -49,7 +49,7 @@ as pull requests from forks, which only a collaborator can merge.
 The same thing with the GitHub CLI, once `gh auth login` has been done:
 
 ```
-gh api -X PUT repos/Giovanniclini/tetris-gym-gb/branches/main/protection \
+gh api -X PUT repos/Giovanniclini/tetris-lab-gb/branches/main/protection \
   -f 'required_status_checks[strict]=true' \
   -f 'required_status_checks[contexts][]=build and test' \
   -F 'enforce_admins=true' \
@@ -61,7 +61,7 @@ gh api -X PUT repos/Giovanniclini/tetris-gym-gb/branches/main/protection \
 
 ```
 python3 build.py --original     # must print the byte-exact match
-python3 build.py                # the Gym ROM
+python3 build.py                # the Lab ROM
 python3 tests/test_original.py
 python3 tests/test_expansion.py
 ```
@@ -75,7 +75,7 @@ python3 -m venv .venv
 .venv/bin/python tests/test_menu.py
 .venv/bin/python tests/test_restart.py
 .venv/bin/python tests/test_sps.py
-.venv/bin/python tests/test_gymmenu.py
+.venv/bin/python tests/test_labmenu.py
 .venv/bin/python tests/test_link.py
 ```
 

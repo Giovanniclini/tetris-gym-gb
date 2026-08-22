@@ -44,7 +44,7 @@ jobs:
 
       # --patch also emits the BPS a release ships, and verifies that applying
       # it to the stock ROM reproduces this build.
-      - name: Build the Gym ROM and the release patch
+      - name: Build the Lab ROM and the release patch
         run: python3 build.py --patch
 
       - name: Byte-level tests
@@ -61,7 +61,7 @@ jobs:
           python3 tests/test_menu.py
           python3 tests/test_restart.py
           python3 tests/test_sps.py
-          python3 tests/test_gymmenu.py
+          python3 tests/test_labmenu.py
           python3 tests/test_link.py
 
       # Patches only, never ROM data. See docs/research.md section 7.

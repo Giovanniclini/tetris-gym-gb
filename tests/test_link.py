@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Two-player rendezvous, now that the Gym menu has replaced the title screen.
+"""Two-player rendezvous, now that the Lab menu has replaced the title screen.
 
     .venv/bin/python tests/test_link.py
 
 PyBoy's serial is a stub - `set_SB` hard-codes $FF, "connecting is not
 implemented yet" - so no real exchange between two units can be emulated here.
-What *can* be checked is everything the Gym itself does:
+What *can* be checked is everything the Lab itself does:
 
   * that the bytes it puts on the wire are the original's, byte for byte;
   * that it keeps pinging, every frame, from the state the original's serial
@@ -14,7 +14,7 @@ What *can* be checked is everything the Gym itself does:
     same HRAM the real handler writes.
 
 What is left untested is the physical exchange, which happens in
-SerialInterruptHandler - original code the Gym does not touch. See
+SerialInterruptHandler - original code the Lab does not touch. See
 docs/decisions/0007.
 """
 
@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.emu import Tetris, sym  # noqa: E402
 
-ROM = "build/tetrisgym.gb"
+ROM = "build/tetrislab.gb"
 STOCK = "build/tetris.gb"
 
 GS_TITLE_SCREEN_MAIN = 0x07
@@ -42,7 +42,7 @@ SC_PING = 0x80                       # SC_REQUEST_TRANSFER | SC_PASSIVE
 
 MODE_2PLAYER = 2
 
-wGymMode = sym("wGymMode")
+wLabMode = sym("wLabMode")
 
 
 def to_menu(t):
@@ -55,29 +55,29 @@ def to_row(t, row):
     to_menu(t)
     for _ in range(row):
         t.press("down")
-    assert t[wGymMode] == row, f"wanted row {row}, cursor is on {t[wGymMode]}"
+    assert t[wLabMode] == row, f"wanted row {row}, cursor is on {t[wLabMode]}"
     return t
 
 
 def _find(haystack, needle, start=0x8000):
     i = haystack.find(needle, start)
-    assert i >= 0, "sequence not found in the Gym banks"
+    assert i >= 0, "sequence not found in the Lab banks"
     return i
 
 
 def test_the_ping_is_the_originals_bytes():
     """Transcription, not reimplementation: the passive ping the title screen
-    sent at $0488 appears verbatim in the Gym's banks."""
+    sent at $0488 appears verbatim in the Lab's banks."""
     stock = (ROOT / STOCK).read_bytes()
-    gym = (ROOT / ROM).read_bytes()
-    _find(gym, stock[0x0488:0x0493])
+    lab = (ROOT / ROM).read_bytes()
+    _find(lab, stock[0x0488:0x0493])
 
 
 def test_the_master_handshake_is_the_originals_bytes():
     """Likewise for the master's announcement at $04C5."""
     stock = (ROOT / STOCK).read_bytes()
-    gym = (ROOT / ROM).read_bytes()
-    _find(gym, stock[0x04C5:0x04CD])
+    lab = (ROOT / ROM).read_bytes()
+    _find(lab, stock[0x04C5:0x04CD])
 
 
 def test_boot_goes_straight_to_the_menu():
@@ -149,7 +149,7 @@ def test_two_player_with_no_cable_stays_on_the_menu():
         assert t.state == GS_TITLE_SCREEN_MAIN, (
             f"went somewhere without a partner (state ${t.state:02X})"
         )
-        assert t[wGymMode] == MODE_2PLAYER, "the cursor moved on its own"
+        assert t[wLabMode] == MODE_2PLAYER, "the cursor moved on its own"
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

@@ -74,10 +74,10 @@ def goto(t, row, mode_addr):
 def main():
     from tools.emu import sym
 
-    mode = sym("wGymMode")
+    mode = sym("wLabMode")
     print("screenshots:")
 
-    with Tetris("build/tetrisgym.gb") as t:
+    with Tetris("build/tetrislab.gb") as t:
         t.to_menu()
         shoot(t, "menu")
 
@@ -100,7 +100,7 @@ def main():
         t.tick(40)
         shoot(t, "transition")
 
-    with Tetris("build/tetrisgym.gb") as t:
+    with Tetris("build/tetrislab.gb") as t:
         t.to_level_select()
         t.press("select")                       # hearts on
         while t[hATypeLevel] < 9:

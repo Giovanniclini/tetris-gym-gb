@@ -15,12 +15,12 @@ ds $08-@, $00
 RST_08::
 	jp   Begin2                                                     ; $0008
 
-; --- tetris-gym-gb deviation #3 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #3 (see src/original/UPSTREAM.md) ---
 ; Extended gravity table, placed in this 29-byte run of $ff padding so that
 ; bank 0 does not have to shift. KLM extends the table by relocating it, which
 ; moves every byte after it and is why that ROM is a 20KB binary diff.
-IF GYM
-INCLUDE "gym/gravity.inc"
+IF LAB
+INCLUDE "lab/gravity.inc"
 ENDC
 ; --- end deviation #3 ---
 
@@ -41,9 +41,9 @@ JumpTable::
 	pop  hl                                                         ; $0032
 	jp   hl                                                         ; $0033
 
-; --- tetris-gym-gb deviation #7 (continued) ---
-IF GYM
-INCLUDE "gym/softreset.inc"
+; --- tetris-lab-gb deviation #7 (continued) ---
+IF LAB
+INCLUDE "lab/softreset.inc"
 ENDC
 ; --- end deviation #7 ---
 
@@ -185,11 +185,11 @@ UnusedSerialFunc_clearIntFlagsIfSerialFunc2_2PlayerInGame:
 	ei                                                              ; $00d8
 	ret                                                             ; $00d9
 
-; --- tetris-gym-gb deviation #1 (see src/original/UPSTREAM.md) ---
-; This padding ($00DA-$00FF, 38 bytes of $ff) is the only place the Gym is
-; allowed to occupy in the original banks. Guarded so a GYM=0 build is
+; --- tetris-lab-gb deviation #1 (see src/original/UPSTREAM.md) ---
+; This padding ($00DA-$00FF, 38 bytes of $ff) is the only place the Lab is
+; allowed to occupy in the original banks. Guarded so a LAB=0 build is
 ; byte-identical to the stock ROM.
-IF GYM
+IF LAB
 INCLUDE "hooks/trampoline.inc"
 ENDC
 ; --- end deviation #1 ---
@@ -565,13 +565,13 @@ MainLoop:
 	ldh  a, [hButtonsHeld]                                          ; $02cd
 	and  PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $02cf
 	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $02d1
-; --- tetris-gym-gb deviation #8 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #8 (see src/original/UPSTREAM.md) ---
 ; The ROM has two soft-reset checks. This one runs every frame; the other is
 ; inside InGameCheckResetAndPause and only runs while gameplay is ticking, so
 ; it goes quiet during the restart's init frames and this one would reboot us.
-; `call` rather than `jp` so the Gym can decline and let the loop carry on.
-IF GYM
-	call z, GymResetStub
+; `call` rather than `jp` so the Lab can decline and let the loop carry on.
+IF LAB
+	call z, LabResetStub
 ELSE
 	jp   z, Reset                                                   ; $02d3
 ENDC
@@ -616,13 +616,13 @@ ENDC
 ProcessGameState:
 	ldh  a, [hGameState]                                            ; $02f8
 	rst  JumpTable                                                  ; $02fa
-; --- tetris-gym-gb deviation #13 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #13 (see src/original/UPSTREAM.md) ---
 ; The one per-frame gameplay hook. Trainers that have to act while the game is
 ; running - starting with the transition trainer, which must set the line count
 ; after the original init has cleared it - all land here rather than adding a
 ; hook each. The handler itself is untouched.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState00_InGameMain
 ENDC
@@ -630,52 +630,52 @@ ENDC
 	dw GameState01_GameOverInit
 	dw GameState02_ShuttleSceneLiftoff
 	dw GameState03_ShuttleSceneShootFire
-; --- tetris-gym-gb deviation #9 (see src/original/UPSTREAM.md) ---
-; Routed through the Gym so the reset combination is seen before this handler
+; --- tetris-lab-gb deviation #9 (see src/original/UPSTREAM.md) ---
+; Routed through the Lab so the reset combination is seen before this handler
 ; acts on Start and walks off to the level select.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState04_LevelEndedMain
 ENDC
 ; --- end deviation #9 ---
 	dw GameState05_BTypeLevelFinished
-; --- tetris-gym-gb deviation #17 (see src/original/UPSTREAM.md) ---
-; The title screen's init, replaced by the Gym menu's, so the original title is
+; --- tetris-lab-gb deviation #17 (see src/original/UPSTREAM.md) ---
+; The title screen's init, replaced by the Lab menu's, so the original title is
 ; never drawn - chaining to it flashes for a frame before the menu paints over.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState06_TitleScreenInit
 ENDC
 ; --- end deviation #17 ---
-; --- tetris-gym-gb deviation #16 (see src/original/UPSTREAM.md) ---
-; The title screen becomes the Gym menu. It has to be this state and no other:
+; --- tetris-lab-gb deviation #16 (see src/original/UPSTREAM.md) ---
+; The title screen becomes the Lab menu. It has to be this state and no other:
 ; SerialFunc0_titleScreen ($0078) only assigns a multiplayer role while
 ; hGameState is $07, and bounces the game back to the title from anywhere else.
 ; See docs/decisions/0007.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState07_TitleScreenMain
 ENDC
 ; --- end deviation #16 ---
-; --- tetris-gym-gb deviation #18 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #18 (see src/original/UPSTREAM.md) ---
 ; B on a level select goes here, which would load the A-TYPE/B-TYPE screen the
-; Gym menu replaced. Sent back to the menu instead.
-IF GYM
-	dw GymStateHook
+; Lab menu replaced. Sent back to the menu instead.
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState08_GameMusicTypeInit
 ENDC
 ; --- end deviation #18 ---
 	dw Stub_148c
-; --- tetris-gym-gb deviation #12 (see src/original/UPSTREAM.md) ---
-; Routed through the Gym so the configured seed is loaded into the LFSR every
+; --- tetris-lab-gb deviation #12 (see src/original/UPSTREAM.md) ---
+; Routed through the Lab so the configured seed is loaded into the LFSR every
 ; time a game begins. Without it a restart would continue the sequence rather
 ; than repeat it, which defeats the point.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState0a_InGameInit
 ENDC
@@ -685,13 +685,13 @@ ENDC
 	dw GameState0d_GameOverScreenClearing
 	dw GameState0e_GameTypeMain
 	dw GameState0f_MusicTypeMain
-; --- tetris-gym-gb deviation #5 (see src/original/UPSTREAM.md) ---
-; Both A-type selection states route through the Gym, which runs its own logic
+; --- tetris-lab-gb deviation #5 (see src/original/UPSTREAM.md) ---
+; Both A-type selection states route through the Lab, which runs its own logic
 ; and then chains to the original handler. Two two-byte table entries; the
 ; handlers themselves are untouched.
-IF GYM
-	dw GymStateHook
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
+	dw LabStateHook
 ELSE
 	dw GameState10_ATypeSelectionInit
 	dw GameState11_ATypeSelectionMain
@@ -700,11 +700,11 @@ ENDC
 	dw GameState12_BTypeSelectionInit
 	dw GameState13_BTypeSelectionMain
 	dw GameState14_BTypeHighMain
-; --- tetris-gym-gb deviation #11 (see src/original/UPSTREAM.md) ---
-; Routed through the Gym so the reset combination restarts the drill from the
+; --- tetris-lab-gb deviation #11 (see src/original/UPSTREAM.md) ---
+; Routed through the Lab so the reset combination restarts the drill from the
 ; name entry screen rather than rebooting.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState15_EnteringHighScore
 ENDC
@@ -723,13 +723,13 @@ ENDC
 	dw GameState21_2PlayerLoserMain
 	dw GameState22_DancersInit
 	dw GameState23_DancersMain
-; --- tetris-gym-gb deviation #15 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #15 (see src/original/UPSTREAM.md) ---
 ; The copyright screen, skipped entirely: 8.5 seconds before the title on every
 ; boot of a ROM whose point is that you restart it constantly. Its only lasting
 ; effect is copying DemoPieces into wDemoOrMultiplayerPieces, which only the
 ; attract demo reads - 2-player fills that table itself at $068C.
-IF GYM
-	dw GymStateHook
+IF LAB
+	dw LabStateHook
 ELSE
 	dw GameState24_CopyrightDisplay
 ENDC
@@ -1174,8 +1174,8 @@ SetNumFramesUntilPiecesMoveDown:
 
 .setTopSpeedForPieces:
 ; get num frames needed for a piece to move down from table idxed DE
-IF GYM
-	ld   hl, GymFramesData          ; deviation #3: 23 entries, levels 0-22
+IF LAB
+	ld   hl, LabFramesData          ; deviation #3: 23 entries, levels 0-22
 ELSE
 	ld   hl, .framesData                                            ; $1afa
 ENDC
@@ -1248,10 +1248,10 @@ PopulateGameScreenWithRandomBlocks:
 
 .mainLoop:
 ; random val in B
-; --- tetris-gym-gb deviation #10 (continued) ---
+; --- tetris-lab-gb deviation #10 (continued) ---
 ; B-type's starting garbage draws from the same source, so it is seeded too.
-IF GYM
-	call GymRandom
+IF LAB
+	call LabRandom
 ELSE
 	ldh  a, [rDIV]                                                  ; $1b6f
 	ld   b, a                                                       ; $1b71
@@ -1416,14 +1416,14 @@ InGameCheckResetAndPause:
 	ldh  a, [hButtonsHeld]                                          ; $1c0d
 	and  PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $1c0f
 	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A                       ; $1c11
-; --- tetris-gym-gb deviation #7 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #7 (see src/original/UPSTREAM.md) ---
 ; Gameplay has its own reset check, separate from the one in MainLoop, and this
 ; is the one that fires while playing. Restart the drill here instead of
 ; rebooting. Still a `jp`: the handler's `ret` unwinds to whoever called
 ; `.start`, which skips the pause check below - Start is part of the
 ; combination, so returning normally would pause the new game immediately.
-IF GYM
-	jp   z, GymResetStub
+IF LAB
+	jp   z, LabResetStub
 ELSE
 	jp   z, Reset                                                   ; $1c13
 ENDC

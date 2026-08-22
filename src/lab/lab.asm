@@ -1,4 +1,4 @@
-; Gym core - everything this project adds lives in ROM banks 2 and up.
+; Lab core - everything this project adds lives in ROM banks 2 and up.
 ;
 ; Bank 0 and bank 1 remain the original game, byte for byte, except for the
 ; single declared hook in src/hooks/hooks.inc.
@@ -7,7 +7,7 @@ INCLUDE "include/hardware.inc"
 INCLUDE "include/constants.s"   ; pure EQUs, safe in multiple translation units
 INCLUDE "include/structs.s"     ; rb offsets, likewise
 
-INCLUDE "gym/levels.inc"
+INCLUDE "lab/levels.inc"
 
 
 ; hram.s declares a real SECTION, so it cannot be included twice. Its labels
@@ -18,15 +18,15 @@ INCLUDE "gym/levels.inc"
 ; HRAM
 ;
 ; The original leaves exactly two bytes of HRAM free ($FFFD-$FFFE); everything
-; below $FFFD is in use. hGymBank must be in HRAM because the trampoline uses
+; below $FFFD is in use. hLabBank must be in HRAM because the trampoline uses
 ; `ldh`, and because it is touched on every bank switch.
 ; ---------------------------------------------------------------------------
 
-SECTION "Gym HRAM", HRAM[$FFFD]
-hGymBank:: db            ; ROM bank currently selected by FarCall
+SECTION "Lab HRAM", HRAM[$FFFD]
+hLabBank:: db            ; ROM bank currently selected by FarCall
 
 ; Read once per piece draw, so it earns one of the two free HRAM bytes.
-hGymSpsEnabled:: db
+hLabSpsEnabled:: db
 
 ; ---------------------------------------------------------------------------
 ; WRAM
@@ -43,7 +43,7 @@ hGymSpsEnabled:: db
 ; there). An earlier draft of docs/architecture.md said otherwise, based on a
 ; less complete disassembly's memory map.
 ;
-; Gym code must never write outside this range.
+; Lab code must never write outside this range.
 ; ---------------------------------------------------------------------------
 
 ; ---------------------------------------------------------------------------
@@ -62,88 +62,88 @@ hGymSpsEnabled:: db
 ; a SECTION address must be known at assembly time, not link time.
 ; ---------------------------------------------------------------------------
 
-SECTION "Gym High Scores", WRAM0[$D762]
-wGymATypeHighScoresExt::
+SECTION "Lab High Scores", WRAM0[$D762]
+wLabATypeHighScoresExt::
 	ds HISCORE_SIZEOF * (MAX_LEVEL + 1 - 10)
 
 
-SECTION "Gym State", WRAM0[$D8C1]
-wGymState::
+SECTION "Lab State", WRAM0[$D8C1]
+wLabState::
 
 ; Level picker, shown in a single cell to the right of the original 0-9 grid.
-wGymFocus::        db        ; 0 grid, 1 level, 2-5 the four seed digits
-wGymPickerLevel::  db        ; 0-22, shown as 0-9 then A-M
-wGymBlinkTimer::   db        ; frame counter for the focus blink
-wGymBlinkPhase::   db        ; current blink phase
+wLabFocus::        db        ; 0 grid, 1 level, 2-5 the four seed digits
+wLabPickerLevel::  db        ; 0-22, shown as 0-9 then A-M
+wLabBlinkTimer::   db        ; frame counter for the focus blink
+wLabBlinkPhase::   db        ; current blink phase
 
 ; The original's init copies the whole layout back over the screen after our
 ; init runs, so anything we draw during init is erased. Repaint a frame later.
-wGymRedrawPending:: db
+wLabRedrawPending:: db
 
 ; Set while an instant restart is in flight, so MainLoop's reset check knows to
 ; leave it alone. Without it there is no way to tell our restart apart from the
 ; level select starting a game, which reaches the same state.
-wGymRestarting:: db
+wLabRestarting:: db
 
 ; SPS state. Sixteen bits, low byte first, matching the community's seeded ROM.
 ; $0000 is degenerate - period 1, always returns zero - so seeds are forced
 ; non-zero when set. See docs/existing-hacks.md section 4.2.
-wGymRngLo:: db
-wGymRngHi:: db
+wLabRngLo:: db
+wLabRngHi:: db
 
 ; The seed as configured on the menu, copied into the LFSR at the start of every
 ; game. Kept separate because the LFSR state advances during play, and a restart
 ; must repeat the sequence rather than continue it.
-wGymSeedLo:: db
-wGymSeedHi:: db
+wLabSeedLo:: db
+wLabSeedHi:: db
 
-; Gym menu. wGymMode is the row the cursor sits on, and survives into the game
+; Lab menu. wLabMode is the row the cursor sits on, and survives into the game
 ; so trainers can ask which drill is running.
-wGymMode::        db        ; MODE_TETRIS / MODE_BTYPE / MODE_TRANSITION
-wGymDrillPending:: db       ; set at game init, consumed on the first game frame
-wGymDrillLevel::  db        ; the level the TRANSITION row is set to
-wGymSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
+wLabMode::        db        ; MODE_TETRIS / MODE_BTYPE / MODE_TRANSITION
+wLabDrillPending:: db       ; set at game init, consumed on the first game frame
+wLabDrillLevel::  db        ; the level the TRANSITION row is set to
+wLabSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
 
-; The controller as the player actually held it, before GymSuppressPushdown
+; The controller as the player actually held it, before LabSuppressPushdown
 ; edits it. Anything that wants to *show* the input - toni asked for an input
 ; display - must read this, not the HRAM the game reads.
-wGymButtonsHeld::    db
-wGymButtonsPressed:: db
+wLabButtonsHeld::    db
+wLabButtonsPressed:: db
 
 	ds 1007
-wGymStateEnd::
+wLabStateEnd::
 
 ; ---------------------------------------------------------------------------
-; Bank 2 - Gym core
+; Bank 2 - Lab core
 ; ---------------------------------------------------------------------------
 
-SECTION "Gym Core", ROMX[$4000], BANK[2]
+SECTION "Lab Core", ROMX[$4000], BANK[2]
 
-GymVersion::
-	db "TETRISGYMGB 0.2", 0
+LabVersion::
+	db "TETRISLABGB 0.2", 0
 
-; Entry point for the Gym, reached via FarCall with b = BANK(GymInit).
+; Entry point for the Lab, reached via FarCall with b = BANK(LabInit).
 ; Does nothing yet: Milestone 0.5 expands the cartridge, it does not add
 ; behaviour. The trampoline and this stub exist so that Milestone 1 has
 ; somewhere to land.
-GymInit::
+LabInit::
 	ret
 
 ; ---------------------------------------------------------------------------
 ; State dispatch
 ;
-; Reached from GymStateHook in bank 0, with bank 2 mapped. Does the Gym's own
+; Reached from LabStateHook in bank 0, with bank 2 mapped. Does the Lab's own
 ; work, then returns in HL the address of the original handler for the caller
 ; to chain to.
 ;
 ; This code must not call anything in $4000-$7FFF: while bank 2 is mapped that
-; range is Gym code, not the original bank 1. Calls into bank 0 are fine, but
+; range is Lab code, not the original bank 1. Calls into bank 0 are fine, but
 ; only if the target does not itself reach into bank 1 - the original A-type
 ; init calls the sound engine, which does. So we touch RAM only, and let the
 ; original handler run afterwards with bank 1 restored.
 ; ---------------------------------------------------------------------------
 
-GymDispatch::
+LabDispatch::
 	ldh  a, [hGameState]
 	cp   GS_LEVEL_ENDED_MAIN
 	jr   z, .levelEnded
@@ -167,14 +167,14 @@ GymDispatch::
 ; The original main handler only calls bank-0 routines, so we can run it
 ; ourselves and then correct what it did. Fixing up afterwards is the only way
 ; to move the cursor sprite, which the original repositions on its own terms.
-	call GymLevelSelectMain
+	call LabLevelSelectMain
 	call GameState11_ATypeSelectionMain
-	call GymLevelSelectPost
+	call LabLevelSelectPost
 	ld   hl, Stub_148c              ; the stub's `jp hl` must land somewhere
 	ret
 
 .init:
-	call GymLevelSelectInit
+	call LabLevelSelectInit
 	ld   hl, GameState10_ATypeSelectionInit
 	ret
 
@@ -184,10 +184,10 @@ GymDispatch::
 ; Catch the combination here instead, which is what makes "top out, go again"
 ; work.
 .levelEnded:
-	call GymResetComboHeld
+	call LabResetComboHeld
 	jr   nz, .runLevelEnded
 
-	call GymInGameReset             ; state is GS_LEVEL_ENDED_MAIN: restarts
+	call LabInGameReset             ; state is GS_LEVEL_ENDED_MAIN: restarts
 	ld   hl, Stub_148c
 	ret
 
@@ -198,10 +198,10 @@ GymDispatch::
 ; Typing a high score name. Restarting here abandons the score, which is the
 ; point: when you are drilling you want another go, not a leaderboard entry.
 .nameEntry:
-	call GymResetComboHeld
+	call LabResetComboHeld
 	jr   nz, .runNameEntry
 
-	call GymInGameReset
+	call LabInGameReset
 	ld   hl, Stub_148c
 	ret
 
@@ -213,15 +213,15 @@ GymDispatch::
 ; is the one place to load the configured seed into the LFSR. A restart must
 ; repeat the sequence, not continue it.
 .gameInit:
-	call GymArmSeed
-	call GymArmDrill
+	call LabArmSeed
+	call LabArmDrill
 	ld   hl, GameState0a_InGameInit
 	ret
 
 ; The copyright screen: 8.5 seconds before the title, every boot. Its only
 ; lasting effect is copying DemoPieces into wDemoOrMultiplayerPieces, and the
 ; only thing that reads that is the attract demo - 2-player shuffles its own
-; table into it at $068C. The Gym menu never runs a demo, so none of it is
+; table into it at $068C. The Lab menu never runs a demo, so none of it is
 ; needed. The tile data comes from $06 either way.
 .skipCopyright:
 	ld   a, GS_TITLE_SCREEN_INIT
@@ -278,8 +278,8 @@ GymDispatch::
 	ldh  [rIE], a
 
 	ld   a, SEED_IDLE
-	ld   [wGymSeedDigit], a
-	call GymMenuDraw
+	ld   [wLabSeedDigit], a
+	call LabMenuDraw
 
 ; Start the music the MUSIC row is set to. The screens this menu replaced each
 ; did their own: the title screen played MUS_TITLE_SCREEN, the A/B screen played
@@ -293,18 +293,18 @@ GymDispatch::
 	ret
 
 ; B on a level select goes to $08, which would load the A-TYPE/B-TYPE screen.
-; Send it back to the Gym menu instead - that is where it came from.
+; Send it back to the Lab menu instead - that is where it came from.
 .backToMenu:
 	ld   a, GS_TITLE_SCREEN_INIT
 	ldh  [hGameState], a
 	ld   hl, Stub_148c
 	ret
 
-; The Gym menu, on the title screen. The original handler never runs - this is a
-; replacement, not an extension - so the Gym has to keep pinging for a link
+; The Lab menu, on the title screen. The original handler never runs - this is a
+; replacement, not an extension - so the Lab has to keep pinging for a link
 ; partner in its place.
 .menu:
-	call GymMenu
+	call LabMenu
 	ld   hl, Stub_148c
 	ret
 
@@ -312,8 +312,8 @@ GymDispatch::
 ; init has run belongs here: that init clears the line count and the score, so
 ; setting them beforehand achieves nothing.
 .inGameMain:
-	call GymDrillApply
-	call GymSuppressPushdown
+	call LabDrillApply
+	call LabSuppressPushdown
 	ld   hl, GameState00_InGameMain
 	ret
 
@@ -324,7 +324,7 @@ GymDispatch::
 ; Level picker and seed entry
 ;
 ; The original 0-9 grid is left completely alone - same tiles, same cursor, same
-; movement. The Gym adds two fields in the blank strip to its right:
+; movement. The Lab adds two fields in the blank strip to its right:
 ;
 ;        cols 15-18
 ;   row  6      .  L  .  .      level, 0-9 then A-M
@@ -352,22 +352,22 @@ DEF FOCUS_LEVEL   EQU 1
 
 
 
-GymLevelSelectInit::
+LabLevelSelectInit::
 ; hATypeLevel may hold a level above the grid, set last time a game started.
 	ldh  a, [hATypeLevel]
 	cp   GRID_LAST + 1
 	jr   nc, .aboveGrid
 
 	ld   a, FOCUS_GRID
-	ld   [wGymFocus], a
+	ld   [wLabFocus], a
 	ld   a, GRID_LAST + 1           ; a sensible first value to offer
-	ld   [wGymPickerLevel], a
+	ld   [wLabPickerLevel], a
 	jr   .pending
 
 .aboveGrid:
-	ld   [wGymPickerLevel], a
+	ld   [wLabPickerLevel], a
 	ld   a, FOCUS_LEVEL
-	ld   [wGymFocus], a
+	ld   [wLabFocus], a
 
 ; A game just ended above the grid, and the original's init - which runs next -
 ; files the score under whatever hATypeLevel says at that moment. It is about to
@@ -381,15 +381,15 @@ GymLevelSelectInit::
 
 .pending:
 	ld   a, 1
-	ld   [wGymRedrawPending], a
+	ld   [wLabRedrawPending], a
 	ret
 
 
-GymLevelSelectMain::
+LabLevelSelectMain::
 ; While the reset combination is held, do not let the menu act on Start. It is
 ; part of the combination, so the menu would start a game that is then rebooted
 ; a frame later - you see it flash up on screen before the logo returns.
-	call GymResetComboHeld
+	call LabResetComboHeld
 	jr   nz, .notResetting
 
 	ldh  a, [hButtonsPressed]
@@ -399,14 +399,14 @@ GymLevelSelectMain::
 	ret
 
 .notResetting:
-	ld   a, [wGymRedrawPending]
+	ld   a, [wLabRedrawPending]
 	and  a
 	jr   z, .readInput
 	xor  a
-	ld   [wGymRedrawPending], a
-	call GymDrawHearts
-	call GymUpdateHighScores        ; the original's init painted the grid level
-	call GymPaintFields
+	ld   [wLabRedrawPending], a
+	call LabDrawHearts
+	call LabUpdateHighScores        ; the original's init painted the grid level
+	call LabPaintFields
 
 .readInput:
 	ldh  a, [hButtonsPressed]
@@ -426,10 +426,10 @@ GymLevelSelectMain::
 
 .storeHearts:
 	ldh  [hIsHardMode], a
-	call GymDrawHearts
+	call LabDrawHearts
 
 .afterSelect:
-	ld   a, [wGymFocus]
+	ld   a, [wLabFocus]
 	and  a
 	jr   nz, .levelFocus
 
@@ -441,7 +441,7 @@ GymLevelSelectMain::
 	cp   GRID_LAST
 	ret  nz
 	ld   a, FOCUS_LEVEL
-	ld   [wGymFocus], a
+	ld   [wLabFocus], a
 	jr   .consume
 
 ; --- the level field has focus ---
@@ -451,8 +451,8 @@ GymLevelSelectMain::
 	bit  PADB_LEFT, c
 	jr   z, .levelNotLeft
 	xor  a                          ; FOCUS_GRID
-	ld   [wGymFocus], a
-	call GymShowGridCursor
+	ld   [wLabFocus], a
+	call LabShowGridCursor
 	jr   .consume
 
 .levelNotLeft:
@@ -462,21 +462,21 @@ GymLevelSelectMain::
 .levelNotRight:
 	bit  PADB_UP, c
 	jr   z, .levelNotUp
-	ld   a, [wGymPickerLevel]
+	ld   a, [wLabPickerLevel]
 	cp   MAX_LEVEL
 	jr   nc, .consume               ; already at M
 	inc  a
-	ld   [wGymPickerLevel], a
+	ld   [wLabPickerLevel], a
 	jr   .consume
 
 .levelNotUp:
 	bit  PADB_DOWN, c
 	ret  z
-	ld   a, [wGymPickerLevel]
+	ld   a, [wLabPickerLevel]
 	and  a
 	jr   z, .consume                ; already at 0
 	dec  a
-	ld   [wGymPickerLevel], a
+	ld   [wLabPickerLevel], a
 	jr   .consume
 
 .consume:
@@ -488,17 +488,17 @@ GymLevelSelectMain::
 	ldh  [hButtonsPressed], a
 	ld   a, SND_MOVING_SELECTION
 	ld   [wSquareSoundToPlay], a
-	call GymUpdateHighScores
-	jp   GymPaintFields
+	call LabUpdateHighScores
+	jp   LabPaintFields
 
 
 ; Runs after the original handler.
-GymLevelSelectPost::
+LabLevelSelectPost::
 	ldh  a, [hGameState]
 	cp   GS_A_TYPE_SELECTION_MAIN
 	jr   nz, .leavingScreen
 
-	ld   a, [wGymFocus]
+	ld   a, [wLabFocus]
 	and  a
 	ret  z                          ; grid has focus: nothing to correct
 
@@ -512,7 +512,7 @@ GymLevelSelectPost::
 ; Hearts are min(level + 10, 20). Above level 20 that ceiling clamps downward
 ; and makes the game slower, so hearts are turned off up there rather than
 ; changing the original formula. See docs/existing-hacks.md 3.2b.
-	ld   a, [wGymPickerLevel]
+	ld   a, [wLabPickerLevel]
 	cp   21
 	jr   c, .blink
 	ldh  a, [hIsHardMode]
@@ -520,34 +520,34 @@ GymLevelSelectPost::
 	jr   z, .blink
 	xor  a
 	ldh  [hIsHardMode], a
-	call GymDrawHearts
+	call LabDrawHearts
 
 .blink:
-	ld   hl, wGymBlinkTimer
+	ld   hl, wLabBlinkTimer
 	inc  [hl]
 	ld   a, [hl]
 	and  $10
 	ld   b, a
-	ld   a, [wGymBlinkPhase]
+	ld   a, [wLabBlinkPhase]
 	cp   b
 	ret  z
 	ld   a, b
-	ld   [wGymBlinkPhase], a
-	jp   GymPaintFields
+	ld   [wLabBlinkPhase], a
+	jp   LabPaintFields
 
 ; The original has handed over - to the game, or back a screen. hATypeLevel has
 ; been holding a grid index so the original cursor code kept working; now that
 ; nothing else reads it as an index, fold in the level field.
 .leavingScreen:
-	ld   a, [wGymFocus]
+	ld   a, [wLabFocus]
 	and  a
 	ret  z                          ; grid has focus: the cursor is the level
-	ld   a, [wGymPickerLevel]
+	ld   a, [wLabPickerLevel]
 	ldh  [hATypeLevel], a
 	ret
 
 
-GymShowGridCursor::
+LabShowGridCursor::
 	xor  a
 	ld   [wSpriteSpecs + SPR_SPEC_Hidden], a
 	ld   de, wSpriteSpecs + SPR_SPEC_BaseYOffset
@@ -559,8 +559,8 @@ GymShowGridCursor::
 
 ; Add B (1 or -1) to the nibble the focus is on, wrapping 0-F.
 ; C = digit index 0-3, leftmost first.
-GymAdjustSeedNibble::
-	call GymReadSeedNibble
+LabAdjustSeedNibble::
+	call LabReadSeedNibble
 	add  b
 	and  $0f
 	ld   d, a                       ; d = new nibble
@@ -570,11 +570,11 @@ GymAdjustSeedNibble::
 	cp   2
 	jr   c, .highByte
 
-	ld   hl, wGymSeedLo
+	ld   hl, wLabSeedLo
 	jr   .haveByte
 
 .highByte:
-	ld   hl, wGymSeedHi
+	ld   hl, wLabSeedHi
 
 .haveByte:
 	ld   a, c
@@ -597,15 +597,15 @@ GymAdjustSeedNibble::
 
 
 ; Nibble C (0-3, leftmost first) of the seed, returned in A.
-GymReadSeedNibble::
+LabReadSeedNibble::
 	ld   a, c
 	cp   2
 	jr   c, .fromHigh
-	ld   a, [wGymSeedLo]
+	ld   a, [wLabSeedLo]
 	jr   .haveByte
 
 .fromHigh:
-	ld   a, [wGymSeedHi]
+	ld   a, [wLabSeedHi]
 
 .haveByte:
 	bit  0, c
@@ -621,28 +621,28 @@ GymReadSeedNibble::
 ; whichever field has focus while the blink phase is off. Ten tilemap writes at
 ; most, so it simply waits for VBlank - the original does the same in
 ; HandleLockdownTransferToTilemap.
-GymPaintFields::
+LabPaintFields::
 .waitVBlank:
 	ldh  a, [rLY]
 	cp   SCRN_Y
 	jr   c, .waitVBlank
 
 ; level field
-	ld   a, [wGymPickerLevel]
+	ld   a, [wLabPickerLevel]
 	ld   b, FOCUS_LEVEL
-	call GymBlankIfFocused
+	call LabBlankIfFocused
 	ld   [PICKER_CELL], a
 
 	ret
 
 
 ; A = TILE_BLANK when field B has focus and the blink is off, else A unchanged.
-GymBlankIfFocused::
+LabBlankIfFocused::
 	push af
-	ld   a, [wGymBlinkPhase]
+	ld   a, [wLabBlinkPhase]
 	and  a
 	jr   nz, .keep                  ; blink on: draw normally
-	ld   a, [wGymFocus]
+	ld   a, [wLabFocus]
 	cp   b
 	jr   nz, .keep
 	pop  af
@@ -656,9 +656,9 @@ GymBlankIfFocused::
 
 ; Keep the TOP SCORE panel showing the level you are actually about to play.
 ;
-; The original drives it from hATypeLevel, which the Gym keeps as the grid index
+; The original drives it from hATypeLevel, which the Lab keeps as the grid index
 ; while the level field or the seed has focus - so it kept showing the grid
-; cursor's scores while you had M selected. A-M have their own slots (see "Gym
+; cursor's scores while you had M selected. A-M have their own slots (see "Lab
 ; High Scores" above), so every level shows real scores.
 ;
 ; This is DisplayATypeHighScoresForLevel ($1795) with one substitution: the
@@ -666,17 +666,17 @@ GymBlankIfFocused::
 ; instead would be shorter, but the routine below busy-waits on the LCD and so
 ; can outlast a frame - leaving the borrowed value visible to everything else
 ; that runs in between.
-GymUpdateHighScores::
+LabUpdateHighScores::
 	call DisplayDottedLinesForHighScore
 
-	ld   a, [wGymFocus]
+	ld   a, [wLabFocus]
 	and  a
 	jr   nz, .fromPicker
 	ldh  a, [hATypeLevel]           ; grid focus: the cursor is the level
 	jr   .haveLevel
 
 .fromPicker:
-	ld   a, [wGymPickerLevel]
+	ld   a, [wLabPickerLevel]
 
 .haveLevel:
 	ld   hl, wATypeHighScores
@@ -699,7 +699,7 @@ GymUpdateHighScores::
 
 
 ; ---------------------------------------------------------------------------
-; The Gym menu
+; The Lab menu
 ;
 ; TetrisGYM's game type menu is one scrolling list where the playable modes come
 ; first and the settings follow, each row carrying its own value edited in place
@@ -726,9 +726,9 @@ DEF MENU_STRIDE     EQU 2 * 32                ; a blank line between entries
 DEF MENU_TEXT_COL   EQU 2                     ; label starts 2 cells in
 DEF MENU_VALUE_COL  EQU 13                    ; the row's value, right of it
 DEF MENU_CURSOR     EQU $26                   ; the font's "*"
-DEF SEED_IDLE       EQU $ff                   ; wGymSeedDigit when not editing
+DEF SEED_IDLE       EQU $ff                   ; wLabSeedDigit when not editing
 
-NEWCHARMAP gymfont
+NEWCHARMAP labfont
 	CHARMAP "0", $00
 	CHARMAP "1", $01
 	CHARMAP "2", $02
@@ -774,21 +774,21 @@ SETCHARMAP main
 ; original screen works. $07 is only ever reached through $06 - including when
 ; SerialFunc0_titleScreen bounces a stray serial byte back there - so there is
 ; no first-entry case to handle.
-GymMenu::
-	call GymLinkPing
+LabMenu::
+	call LabLinkPing
 	ldh  a, [hGameState]
 	cp   GS_TITLE_SCREEN_MAIN
 	ret  nz                         ; a partner took over; stop touching the menu
 
-	call GymMenuInput
-	jp   GymMenuRepaint
+	call LabMenuInput
+	jp   LabMenuRepaint
 
 
 ; The title screen's own rendezvous, transcribed from GameState07_TitleScreenMain
 ; ($0488). A second Game Boy finds us by seeing this ping, so the menu has to
 ; keep sending it - and it has to do so from state $07, because
 ; SerialFunc0_titleScreen only assigns roles while hGameState says $07.
-GymLinkPing::
+LabLinkPing::
 	call SerialTransferWaitFunc
 	ld   a, SB_PASSIVES_PING_IN_TITLE_SCREEN
 	ldh  [rSB], a
@@ -801,14 +801,14 @@ GymLinkPing::
 
 	ldh  a, [hMultiplayerPlayerRole]
 	and  a
-	jp   nz, GymStart2Player        ; assigned a role: the master is waiting
+	jp   nz, LabStart2Player        ; assigned a role: the master is waiting
 
 	xor  a                          ; a byte, but no role - not a partner
 	ldh  [hSerialInterruptHandled], a
 	ret
 
 
-GymStart2Player::
+LabStart2Player::
 	xor  a
 	ldh  [hTimer1], a
 	ld   a, GS_2PLAYER_GAME_MUSIC_TYPE_INIT
@@ -816,7 +816,7 @@ GymStart2Player::
 	ret
 
 
-GymMenuInput::
+LabMenuInput::
 	ldh  a, [hButtonsPressed]
 	ld   c, a
 
@@ -824,7 +824,7 @@ GymMenuInput::
 ; being edited. A gets in and out. TetrisGYM gives the seed row the same
 ; treatment (seedControls in gametypemenu/menu.asm); it can leave Up and Down
 ; free for the list because its list scrolls under a throttle and ours does not.
-	ld   a, [wGymSeedDigit]
+	ld   a, [wLabSeedDigit]
 	cp   SEED_IDLE
 	jr   nz, .editingSeed
 
@@ -835,7 +835,7 @@ GymMenuInput::
 
 	bit  PADB_DOWN, c
 	jr   z, .notDown
-	ld   a, [wGymMode]
+	ld   a, [wLabMode]
 	inc  a
 	cp   MODE_COUNT
 	jr   c, .setRow
@@ -845,7 +845,7 @@ GymMenuInput::
 .notDown:
 	bit  PADB_UP, c
 	jr   z, .notUp
-	ld   a, [wGymMode]
+	ld   a, [wLabMode]
 	and  a
 	jr   nz, .decRow
 	ld   a, MODE_COUNT
@@ -862,14 +862,14 @@ GymMenuInput::
 	jr   nz, .haveDelta
 	ld   b, -1
 .haveDelta:
-	ld   a, [wGymMode]
+	ld   a, [wLabMode]
 	cp   MODE_MUSIC
 	jr   z, .adjustMusic
 	cp   MODE_TRANSITION
 	ret  nz
 
 ; the level the drill starts on, 0-22, shown as 0-9 then A-M
-	ld   a, [wGymDrillLevel]
+	ld   a, [wLabDrillLevel]
 	add  b
 	cp   MAX_LEVEL + 1
 	jr   c, .storeLevel
@@ -878,8 +878,8 @@ GymMenuInput::
 	jr   nz, .storeLevel
 	xor  a
 .storeLevel:
-	ld   [wGymDrillLevel], a
-	jp   GymMenuSound
+	ld   [wLabDrillLevel], a
+	jp   LabMenuSound
 
 .adjustMusic:
 	ldh  a, [hMusicType]
@@ -889,26 +889,26 @@ GymMenuInput::
 	add  MUSIC_TYPES_START
 	ldh  [hMusicType], a
 	call PlaySongBasedOnMusicTypeChosen
-	jp   GymMenuSound
+	jp   LabMenuSound
 
 .setRow:
-	ld   [wGymMode], a
-	jp   GymMenuSound
+	ld   [wLabMode], a
+	jp   LabMenuSound
 
 ; Start or A. On a mode it launches; on the seed it opens the digits; on any
 ; other setting it does nothing, the split TetrisGYM draws at MODE_GAME_QUANTITY.
 .confirm:
-	ld   a, [wGymMode]
+	ld   a, [wLabMode]
 	cp   MODE_SEED
 	jr   z, .editSeed
 	cp   MODE_LAUNCHABLE
 	ret  nc
-	jp   GymMenuLaunch
+	jp   LabMenuLaunch
 
 .editSeed:
 	xor  a
-	ld   [wGymSeedDigit], a
-	jp   GymMenuSound
+	ld   [wLabSeedDigit], a
+	jp   LabMenuSound
 
 ; --- the seed row has the D-pad ---
 .editingSeed:
@@ -930,8 +930,8 @@ GymMenuInput::
 .seedAdjust:
 	ld   a, d
 	ld   c, a
-	call GymAdjustSeedNibble
-	jp   GymMenuSound
+	call LabAdjustSeedNibble
+	jp   LabMenuSound
 
 .seedNotDown:
 	bit  PADB_RIGHT, c
@@ -940,8 +940,8 @@ GymMenuInput::
 	cp   3
 	ret  nc
 	inc  a
-	ld   [wGymSeedDigit], a
-	jp   GymMenuSound
+	ld   [wLabSeedDigit], a
+	jp   LabMenuSound
 
 .seedNotRight:
 	bit  PADB_LEFT, c
@@ -950,20 +950,20 @@ GymMenuInput::
 	and  a
 	jr   z, .leaveSeed              ; Left off the first digit leaves the row
 	dec  a
-	ld   [wGymSeedDigit], a
-	jp   GymMenuSound
+	ld   [wLabSeedDigit], a
+	jp   LabMenuSound
 
 .leaveSeed:
 	ld   a, SEED_IDLE
-	ld   [wGymSeedDigit], a
-	jp   GymMenuSound
+	ld   [wLabSeedDigit], a
+	jp   LabMenuSound
 
 
 ; Start on a mode. TETRIS and B-TYPE hand over to that type's level select, the
 ; way the original screen did. TRANSITION carries its own level, so it goes
 ; straight into the game - a drill you set up once and repeat.
-GymMenuLaunch::
-	ld   a, [wGymMode]
+LabMenuLaunch::
+	ld   a, [wLabMode]
 	cp   MODE_2PLAYER
 	jr   z, .keepSerial
 ; What $08 did on the way into a one-player game ($1444): serial off, and the
@@ -979,7 +979,7 @@ GymMenuLaunch::
 	ld   a, SND_CONFIRM_OR_LETTER_TYPED
 	ld   [wSquareSoundToPlay], a
 
-	ld   a, [wGymMode]
+	ld   a, [wLabMode]
 	cp   MODE_BTYPE
 	jr   z, .bType
 	cp   MODE_2PLAYER
@@ -1003,7 +1003,7 @@ GymMenuLaunch::
 .transition:
 	ld   a, GAME_TYPE_A_TYPE
 	ldh  [hGameType], a
-	ld   a, [wGymDrillLevel]
+	ld   a, [wLabDrillLevel]
 	ldh  [hATypeLevel], a
 	ld   a, GS_IN_GAME_INIT
 	ldh  [hGameState], a
@@ -1017,7 +1017,7 @@ GymMenuLaunch::
 .twoPlayer:
 	ldh  a, [hMultiplayerPlayerRole]
 	cp   MP_ROLE_MASTER
-	jp   z, GymStart2Player
+	jp   z, LabStart2Player
 
 	ld   a, SB_MASTER_PRESSING_START
 	ldh  [rSB], a
@@ -1032,29 +1032,29 @@ GymMenuLaunch::
 	ldh  a, [hMultiplayerPlayerRole]
 	and  a
 	ret  z                          ; nobody answered: stay where we are
-	jp   GymStart2Player
+	jp   LabStart2Player
 
 
 ; A = tile, HL = destination. The hardware drops tilemap writes made while a
 ; line is being drawn, so every cell the menu paints goes through here.
 ; Preserves BC and DE, which StoreAinHLwhenLCDFree does not.
-GymPutTile::
+LabPutTile::
 	push bc
 	call StoreAinHLwhenLCDFree
 	pop  bc
 	ret
 
 
-GymMenuSound::
+LabMenuSound::
 	ld   a, SND_MOVING_SELECTION
 	ld   [wSquareSoundToPlay], a
 	ret
 
 
 ; The one-off paint, with the LCD off - the labels never change afterwards.
-GymMenuDraw::
-	ld   b, BANK(GymLoadMenuGfx)
-	ld   hl, GymLoadMenuGfx
+LabMenuDraw::
+	ld   b, BANK(LabLoadMenuGfx)
+	ld   hl, LabLoadMenuGfx
 	call FarCall                    ; LCD off, then the menu tileset
 	call Clear_wOam
 
@@ -1068,17 +1068,17 @@ GymMenuDraw::
 	or   c
 	jr   nz, .blank
 
-	ld   hl, GymMenuTitle
+	ld   hl, LabMenuTitle
 	ld   de, _SCRN0 + 2 * 32 + 3
-	call GymMenuPutString
+	call LabMenuPutString
 
-	ld   hl, GymMenuLabels
+	ld   hl, LabMenuLabels
 	ld   de, MENU_ROW0 + MENU_TEXT_COL
 	ld   b, MODE_COUNT
 .nextLabel:
 	push bc
 	push de
-	call GymMenuPutString
+	call LabMenuPutString
 	pop  de
 	ld   a, e
 	add  LOW(MENU_STRIDE)
@@ -1090,7 +1090,7 @@ GymMenuDraw::
 	dec  b
 	jr   nz, .nextLabel
 
-	call GymMenuPaint
+	call LabMenuPaint
 
 	ld   a, LCDCF_ON|LCDCF_WIN9C00|LCDCF_BG8000|LCDCF_OBJON|LCDCF_BGON
 	ldh  [rLCDC], a
@@ -1098,18 +1098,18 @@ GymMenuDraw::
 
 
 ; Everything that changes: the cursor cells and the row values. Every write goes
-; through GymPutTile, which waits for the LCD - dropped writes are what made the
+; through LabPutTile, which waits for the LCD - dropped writes are what made the
 ; cursor vanish at random and left the music letter stale.
-GymMenuRepaint::
-	ld   hl, wGymBlinkTimer
+LabMenuRepaint::
+	ld   hl, wLabBlinkTimer
 	inc  [hl]
 
-GymMenuPaint::
+LabMenuPaint::
 	ld   de, MENU_ROW0
 	ld   b, 0
 
 .nextRow:
-	ld   a, [wGymMode]
+	ld   a, [wLabMode]
 	cp   b
 	ld   a, MENU_CURSOR
 	jr   z, .putCursor
@@ -1117,18 +1117,18 @@ GymMenuPaint::
 .putCursor:
 	ld   h, d
 	ld   l, e
-	call GymPutTile
+	call LabPutTile
 
 ; the value, if the row has one
 	ld   a, b
 	cp   MODE_TRANSITION
-	call z, GymMenuPaintLevel
+	call z, LabMenuPaintLevel
 	ld   a, b
 	cp   MODE_SEED
-	call z, GymMenuPaintSeed
+	call z, LabMenuPaintSeed
 	ld   a, b
 	cp   MODE_MUSIC
-	call z, GymMenuPaintMusic
+	call z, LabMenuPaintMusic
 
 	ld   hl, MENU_STRIDE
 	add  hl, de
@@ -1142,34 +1142,34 @@ GymMenuPaint::
 
 
 ; DE = row base. Returns HL at the row's value column.
-GymMenuValueCell::
+LabMenuValueCell::
 	ld   hl, MENU_VALUE_COL
 	add  hl, de
 	ret
 
 
 ; 0-9 then A-M: the font puts those tiles at $00-$16, so the tile is the level.
-GymMenuPaintLevel::
-	call GymMenuValueCell
-	ld   a, [wGymDrillLevel]
-	jp   GymPutTile
+LabMenuPaintLevel::
+	call LabMenuValueCell
+	ld   a, [wLabDrillLevel]
+	jp   LabPutTile
 
 
 ; Four hex digits; the tile is the nibble. The digit being edited blinks.
-GymMenuPaintSeed::
-	call GymMenuValueCell
+LabMenuPaintSeed::
+	call LabMenuValueCell
 	push de
 	ld   d, h
 	ld   e, l
 	ld   c, 0
 .digit:
 	push de
-	call GymReadSeedNibble
+	call LabReadSeedNibble
 	push af
-	ld   a, [wGymSeedDigit]
+	ld   a, [wLabSeedDigit]
 	cp   c
 	jr   nz, .draw
-	ld   a, [wGymBlinkTimer]
+	ld   a, [wLabBlinkTimer]
 	and  $10
 	jr   nz, .draw
 	pop  af
@@ -1181,7 +1181,7 @@ GymMenuPaintSeed::
 	pop  de
 	ld   h, d
 	ld   l, e
-	call GymPutTile
+	call LabPutTile
 	inc  de
 	inc  c
 	ld   a, c
@@ -1192,8 +1192,8 @@ GymMenuPaintSeed::
 
 
 ; The music letter. OFF is drawn as a dash.
-GymMenuPaintMusic::
-	call GymMenuValueCell
+LabMenuPaintMusic::
+	call LabMenuValueCell
 	ldh  a, [hMusicType]
 	cp   MUSIC_TYPE_OFF
 	ld   a, $25                     ; "-"
@@ -1202,26 +1202,26 @@ GymMenuPaintMusic::
 	sub  MUSIC_TYPES_START
 	add  $0a                        ; "A"
 .put:
-	jp   GymPutTile
+	jp   LabPutTile
 
 
 ; hl = zero-terminated string, de = tilemap destination.
-GymMenuPutString::
+LabMenuPutString::
 	ld   a, [hl+]
 	and  a
 	ret  z
 	ld   [de], a
 	inc  de
-	jr   GymMenuPutString
+	jr   LabMenuPutString
 
 
 PUSHC
-SETCHARMAP gymfont
-GymMenuTitle::
-	db "TETRIS GYM GB", 0
+SETCHARMAP labfont
+LabMenuTitle::
+	db "TETRIS LAB GB", 0
 
-; One zero-terminated label per row, in wGymMode order.
-GymMenuLabels::
+; One zero-terminated label per row, in wLabMode order.
+LabMenuLabels::
 	db "TETRIS", 0
 	db "B-TYPE", 0
 	db "2 PLAYER", 0
@@ -1248,23 +1248,23 @@ POPC
 ; start level, so there is nothing for the number to mean here.
 ; ---------------------------------------------------------------------------
 
-GymArmDrill::
-	ld   a, [wGymMode]
+LabArmDrill::
+	ld   a, [wLabMode]
 	cp   MODE_TRANSITION
 	ret  nz
 	ld   a, 1
-	ld   [wGymDrillPending], a
+	ld   [wLabDrillPending], a
 	ret
 
 
 ; The original's in-game init clears the line counter, so this runs on the first
 ; gameplay frame instead - after it, not before.
-GymDrillApply::
-	ld   a, [wGymDrillPending]
+LabDrillApply::
+	ld   a, [wLabDrillPending]
 	and  a
 	ret  z
 	xor  a
-	ld   [wGymDrillPending], a
+	ld   [wLabDrillPending], a
 
 ; hATypeLinesThresholdToPassForNextLevel holds the start level, which is also
 ; the number of tens that must be cleared to transition. One ten short of it is
@@ -1305,14 +1305,14 @@ GymDrillApply::
 
 ; Repaint the readout: the original only redraws it on a line clear, so without
 ; this the game shows 000 until the first one.
-	jp   GymDrillPaintLines
+	jp   LabDrillPaintLines
 
 
 ; The four LINES digits, leading zeros blanked, exactly as the original renders
 ; them. Not DisplayBCDNum2CDigits: that writes the tilemap with a bare
 ; `ld [hl+], a`, which is correct for the original - it only ever calls it with
 ; the LCD idle - and drops writes anywhere else.
-GymDrillPaintLines::
+LabDrillPaintLines::
 	ldh  a, [hNumLinesCompletedBCD + 1]
 	ld   d, a
 	ldh  a, [hNumLinesCompletedBCD]
@@ -1322,17 +1322,17 @@ GymDrillPaintLines::
 
 	ld   a, d
 	swap a
-	call GymDrillDigit
+	call LabDrillDigit
 	ld   a, d
-	call GymDrillDigit
+	call LabDrillDigit
 	ld   a, e
 	swap a
-	call GymDrillDigit
+	call LabDrillDigit
 	ld   c, 1                       ; the units digit always shows
 	ld   a, e
 	; falls through
 
-GymDrillDigit:
+LabDrillDigit:
 	and  $0f
 	jr   nz, .visible
 
@@ -1347,7 +1347,7 @@ GymDrillDigit:
 	ld   c, 1
 
 .put:
-	call GymPutTile
+	call LabPutTile
 	inc  hl
 	ret
 
@@ -1377,15 +1377,15 @@ GymDrillDigit:
 ; a B-type game.
 ; ---------------------------------------------------------------------------
 
-GymSuppressPushdown::
+LabSuppressPushdown::
 ; Keep the real thing first, every frame, whether or not it gets edited. What
 ; the game reads is a lie from here on, and something will eventually want the
 ; truth - toni has already asked for an input display, which at L and M would
 ; otherwise show Down as unpressed while the player leans on it.
 	ldh  a, [hButtonsHeld]
-	ld   [wGymButtonsHeld], a
+	ld   [wLabButtonsHeld], a
 	ldh  a, [hButtonsPressed]
-	ld   [wGymButtonsPressed], a
+	ld   [wLabButtonsPressed], a
 
 	ldh  a, [hNumFramesUntilPiecesMoveDown]
 	cp   2                          ; stored as frames-1, so < 2 means under 3
@@ -1402,7 +1402,7 @@ GymSuppressPushdown::
 
 
 ; Show whether hearts are armed, in the blank strip beside "LEVEL".
-GymDrawHearts::
+LabDrawHearts::
 	ldh  a, [hIsHardMode]
 	and  a
 	ld   a, TILE_HEART
@@ -1423,14 +1423,14 @@ GymDrawHearts::
 
 
 ; Z is set when the soft-reset combination is held.
-GymResetComboHeld::
+LabResetComboHeld::
 	ldh  a, [hButtonsHeld]
 	and  PADF_START|PADF_SELECT|PADF_B|PADF_A
 	cp   PADF_START|PADF_SELECT|PADF_B|PADF_A
 	ret
 
 
-GymInGameReset::
+LabInGameReset::
 ; Link play still reboots: restarting one side of a two-player game would
 ; desync the cable, and the original behaviour is the safe one there.
 	ldh  a, [hIs2Player]
@@ -1438,7 +1438,7 @@ GymInGameReset::
 	jp   nz, Reset
 
 ; A restart we started is still initialising: decline, and let it finish.
-	ld   a, [wGymRestarting]
+	ld   a, [wLabRestarting]
 	and  a
 	jr   z, .notRestarting
 
@@ -1447,7 +1447,7 @@ GymInGameReset::
 	jr   z, .consume
 
 	xor  a                          ; init finished
-	ld   [wGymRestarting], a
+	ld   [wLabRestarting], a
 
 .notRestarting:
 ; Restart from anywhere inside a game or its aftermath. Topping out and going
@@ -1499,7 +1499,7 @@ GymInGameReset::
 	ld   a, GS_IN_GAME_INIT
 	ldh  [hGameState], a
 	ld   a, 1
-	ld   [wGymRestarting], a
+	ld   [wLabRestarting], a
 
 ; Consume the combination. MainLoop's check runs later in this same frame, and
 ; during the restart's init frames it is the only one that runs at all.
@@ -1520,14 +1520,14 @@ GymInGameReset::
 ; does, which is genuinely random. That also means the degenerate all-zero LFSR
 ; state can never be reached - it is spent as the "no seed" value instead of
 ; being a trap the way it is in the community's ROM (docs/existing-hacks.md 4.2).
-GymArmSeed::
-	ld   a, [wGymSeedLo]
-	ld   [wGymRngLo], a
+LabArmSeed::
+	ld   a, [wLabSeedLo]
+	ld   [wLabRngLo], a
 	ld   b, a
-	ld   a, [wGymSeedHi]
-	ld   [wGymRngHi], a
+	ld   a, [wLabSeedHi]
+	ld   [wLabRngHi], a
 	or   b                          ; seed zero?
-	ldh  [hGymSpsEnabled], a        ; non-zero arms it, zero disarms it
+	ldh  [hLabSpsEnabled], a        ; non-zero arms it, zero disarms it
 	ret  z
 
 ; Reloading the LFSR is not enough on its own. The generator draws again when

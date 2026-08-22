@@ -55,10 +55,10 @@ hIsHardMode = 0xFFF4
 BOOT_TIMEOUT = 2000     # frames; the copyright screens alone are ~500
 
 
-def sym(name, rom="build/tetrisgym.sym"):
+def sym(name, rom="build/tetrislab.sym"):
     """Address of a label, read from the linker's symbol file.
 
-    Gym RAM moves as the layout changes; a test that hardcodes an address
+    Lab RAM moves as the layout changes; a test that hardcodes an address
     silently asserts on the wrong byte when it does.
     """
     path = ROOT / rom
@@ -80,9 +80,9 @@ class Tetris:
         # on to assert that music is actually playing - rNR52's channel flags are
         # all zero without it.
         self.pb = PyBoy(str(path), window="null", sound_emulated=sound, log_level="ERROR")
-        # The Gym replaces the title screen, so hearts move from the original's
+        # The Lab replaces the title screen, so hearts move from the original's
         # hidden Down+Start there to Select on the level select.
-        self.is_gym = "tetrisgym" in path.name
+        self.is_lab = "tetrislab" in path.name
 
     # -- primitives ---------------------------------------------------------
 
@@ -129,7 +129,7 @@ class Tetris:
     # -- navigation ---------------------------------------------------------
 
     def to_title(self):
-        """Boot to the Gym menu, which lives on the title screen's state.
+        """Boot to the Lab menu, which lives on the title screen's state.
 
         The copyright screen is skipped and the 1P/2P screen is the menu now;
         see docs/decisions/0007. On the stock ROM this still reaches the real
@@ -143,13 +143,13 @@ class Tetris:
         return self
 
     def to_level_select(self, hearts=False):
-        """Gym menu -> TETRIS -> the A-TYPE level select.
+        """Lab menu -> TETRIS -> the A-TYPE level select.
 
-        `hearts` presses Select once there, which is how the Gym arms hard mode
+        `hearts` presses Select once there, which is how the Lab arms hard mode
         (the original's hidden Down+Start lived on the screen the menu replaced).
         """
         self.to_menu()
-        if hearts and not self.is_gym:
+        if hearts and not self.is_lab:
             self.hold("down")                     # the original's hidden combo
             self.press("start")
             self.release("down")
@@ -163,7 +163,7 @@ class Tetris:
             self.press("start")
             self.run_until_state(GS_A_TYPE_SELECTION_MAIN)
         self.tick(20)             # the picker defers its first paint a frame
-        if hearts and self.is_gym:
+        if hearts and self.is_lab:
             self.press("select")
 
     def start_game_at(self, level, hearts=False):

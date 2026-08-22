@@ -32,7 +32,7 @@ future restructuring safe — the failure mode that broke KLM's own author.
   `tests/test_expansion.py`. An undeclared byte fails the build.
 * Bank-0 padding is a scarce, shared resource. Known regions:
   `$000B-$0027` (29 B, holds the gravity table), `$0034-$003F` (12 B, free),
-  `$00DA-$00FF` (38 B, holds `FarCall` + `GymStateHook`).
+  `$00DA-$00FF` (38 B, holds `FarCall` + `LabStateHook`).
 * When new data is too large for padding it goes in bank 2, reached through
   `FarCall` — which means it cannot be read by original code still running in
   bank 1. Plan for that before choosing a location.

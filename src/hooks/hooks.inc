@@ -1,32 +1,32 @@
 ; Declared edits to the original ROM banks 0 and 1.
 ;
-; These are the ONLY places tetris-gym-gb is permitted to change original code.
+; These are the ONLY places tetris-lab-gb is permitted to change original code.
 ; Every entry here is asserted by tests/test_expansion.py, which diffs banks 0-1
 ; against the reference build and fails if a single byte outside this table
 ; differs. Adding an entry is a significant change - see CLAUDE.md principle 3.
 ;
 ;   name              range           bytes  purpose
 ;   ----------------- --------------- -----  --------------------------------
-;   HOOK_TRAMPOLINE   $00DA-$00FF        38  Gym far-call trampoline, placed in
+;   HOOK_TRAMPOLINE   $00DA-$00FF        38  Lab far-call trampoline, placed in
 ;                                            the `ds $100-@, $ff` padding that
 ;                                            sits between the serial interrupt
 ;                                            code and the $0100 entry point.
-;   GYM_GRAVITY_TABLE $000B-$0027        29  Extended 23-entry gravity table
+;   LAB_GRAVITY_TABLE $000B-$0027        29  Extended 23-entry gravity table
 ;                                            (levels 0-22), in the padding that
 ;                                            follows the RST $08 vector.
 ;   HOOK_GRAVITY_PTR  $1AFB-$1AFC         2  Operand of `ld hl, .framesData`,
-;                                            redirected to GymFramesData.
+;                                            redirected to LabFramesData.
 ;   HOOK_STATE_TABLE  $031B-$031E         4  Two entries of ProcessGameState's
 ;                                            jump table ($10 A-type select
 ;                                            init, $11 main), routed through
-;                                            GymStateHook. The handlers
+;                                            LabStateHook. The handlers
 ;                                            themselves are untouched.
-;   GYM_RESET_STUB    $0034-$003F        12  Far-call stub for instant restart,
+;   LAB_RESET_STUB    $0034-$003F        12  Far-call stub for instant restart,
 ;                                            in the padding between the RST $28
 ;                                            handler and the VBlank vector.
 ;   HOOK_MAINLOOP_RST $02D3-$02D5         3  MainLoop's soft-reset `jp z, Reset`
-;                                            becomes `call z, GymResetStub`, so
-;                                            the Gym can decline and carry on.
+;                                            becomes `call z, LabResetStub`, so
+;                                            the Lab can decline and carry on.
 ;   HOOK_INGAME_RST   $1C14-$1C15         2  Operand of the *other* soft-reset
 ;                                            check, inside
 ;                                            InGameCheckResetAndPause. This is
@@ -37,11 +37,11 @@
 ;                                            handler acts on Start.
 ;   HOOK_RNG_PIECE    $2043-$2045         3  `ldh a,[rDIV] / ld b,a` in the
 ;                                            piece generator becomes
-;                                            `call GymRandom` - three bytes for
+;                                            `call LabRandom` - three bytes for
 ;                                            three, so nothing shifts.
 ;   HOOK_RNG_BTYPE    $1B6F-$1B71         3  The same substitution for B-type's
 ;                                            starting garbage.
-;   GYM_RANDOM        $7FC6-$7FEF        42  The LFSR itself, in the empty space
+;   LAB_RANDOM        $7FC6-$7FEF        42  The LFSR itself, in the empty space
 ;                                            between the sound engine and the
 ;                                            sound thunks in bank 1. A new
 ;                                            section in a gap, not an insertion.
@@ -77,10 +77,10 @@
 ;                                            attract demo reads.
 ;   HOOK_STATE_TABLE06 $0307-$030C       6  Jump-table entries for $06 (title
 ;                                            init), $07 (title main) and $08.
-;                                            The title screen becomes the Gym
+;                                            The title screen becomes the Lab
 ;                                            menu, drawn by $06 so the original
 ;                                            never appears even for a frame. $07 is the
-;                                            screen, which becomes the Gym menu.
+;                                            screen, which becomes the Lab menu.
 ;                                            It has to be this state and no
 ;                                            other: SerialFunc0_titleScreen
 ;                                            ($0078) only assigns a multiplayer
@@ -93,7 +93,7 @@
 ;                                            reaches, sent back to the menu so
 ;                                            the A-TYPE/B-TYPE screen the menu
 ;                                            replaced is never drawn.
-;   GYM_BANK1_THUNK   $6430-$644F        32  LoadAsciiAndMenuScreenGfx is in
+;   LAB_BANK1_THUNK   $6430-$644F        32  LoadAsciiAndMenuScreenGfx is in
 ;                                            bank 0 but reads Gfx_Ascii from
 ;                                            bank 1, so it cannot be called
 ;                                            while bank 2 is mapped. This thunk
@@ -111,5 +111,5 @@
 
 DEF HOOK_TRAMPOLINE_START EQU $00DA
 DEF HOOK_TRAMPOLINE_END   EQU $00FF
-DEF GYM_GRAVITY_START     EQU $000B
-DEF GYM_GRAVITY_END       EQU $0027
+DEF LAB_GRAVITY_START     EQU $000B
+DEF LAB_GRAVITY_END       EQU $0027

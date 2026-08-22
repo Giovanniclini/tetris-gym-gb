@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 from tools.emu import (Tetris, rNR52, hATypeLevel, hIsHardMode,  # noqa: E402
                        GS_IN_GAME_MAIN, GS_TITLE_SCREEN_MAIN)
 
-ROM = "build/tetrisgym.gb"
+ROM = "build/tetrislab.gb"
 COMBO = ("a", "b", "select", "start")
 hNumLinesCompletedBCD = 0xFF9E
 hGamePaused = 0xFFAB
@@ -166,7 +166,7 @@ def test_menus_still_reboot():
 def test_the_level_select_does_not_start_a_game_on_the_way_to_rebooting():
     """Start is part of the combination, so the menu would act on it and start a
     game that is rebooted a frame later - visible as a flash of gameplay. The
-    Gym suppresses Start while the combination is held.
+    Lab suppresses Start while the combination is held.
 
     Stock genuinely does this, so the assertion is that we are better than it.
     """
@@ -187,7 +187,7 @@ def test_the_level_select_does_not_start_a_game_on_the_way_to_rebooting():
         "expected stock to start a game here; if not, this test proves nothing"
     )
     assert GS_IN_GAME_INIT not in states_while_held(ROM), (
-        "the Gym started a game on the level select before rebooting"
+        "the Lab started a game on the level select before rebooting"
     )
 
 
@@ -207,7 +207,7 @@ def test_restart_from_the_high_score_name_entry():
 
 
 def test_original_build_still_reboots_from_gameplay():
-    """The GYM=0 build must keep the stock behaviour."""
+    """The LAB=0 build must keep the stock behaviour."""
     with Tetris("build/tetris.gb") as t:
         t.start_game_at(9)
         t.tick(120)

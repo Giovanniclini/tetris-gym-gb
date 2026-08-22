@@ -18,7 +18,7 @@ session. Everything else is sourced from third parties and is flagged accordingl
 | Which ROM version? | **Tetris (World) Rev A — "v1.1"** | High |
 | Which repository? | **`vinheim3/tetris-gb-disasm`** (MIT, 100 % coverage) | High |
 | Does it actually build? | **Yes — byte-exact, first try, zero patches** | Verified |
-| Can Gym features fit in the original ROM? | **No.** ~400 free bytes in 32 KB. Must expand to an MBC. | Verified |
+| Can Lab features fit in the original ROM? | **No.** ~400 free bytes in 32 KB. Must expand to an MBC. | Verified |
 | Is that expansion risky? | Low. The original game already writes `1` to `$2000`. | Verified |
 
 ---
@@ -44,19 +44,19 @@ ROM  SHA-1: FD9079CB5E8479EB06D93C2AE5175BFCE871746A   (clean input)
 > [CelestialAmber's](https://github.com/CelestialAmber/TetrisNESDisasm) subsequent take on it."
 
 So TetrisGYM is **exactly the model this project hypothesised**: disassembly → reverse engineer →
-modify → add Gym features. The hypothesis is validated by precedent.
+modify → add Lab features. The hypothesis is validated by precedent.
 
 ### 1.3 How the modification is structured
 
 The source tree is *not* "original code plus a patch file". The disassembly **is** the source, and
-Gym functionality is factored into dedicated directories that the original code calls into:
+Lab functionality is factored into dedicated directories that the original code calls into:
 
 ```
 src/
   main.asm  reset.asm  boot.asm  header.asm  ram.asm       <- original game, reorganised
   gamemode/          gamemodestate/      playstate/         <- original state machine, split per state
   nmi/                                                      <- render path, split per screen
-  modes/             <- ALL GYM FEATURES LIVE HERE
+  modes/             <- ALL LAB FEATURES LIVE HERE
     crash.asm  crunch.asm  debug.asm  drought.asm  events.asm
     floor.asm  garbage.asm  hz.asm  pace.asm  parity.asm
     preset.asm  qtap.asm  saveslots.asm  tapqty.asm  tspins.asm
@@ -339,10 +339,10 @@ Named entries from meithecatte's `constants.asm`:
 `21 HIGHSCORE_ENTER_NAME`, `36 LOAD_COPYRIGHT`, `37 COPYRIGHT`, `42 LOAD_MULTIPLAYER_MUSIC_SELECT`,
 `53 MORE_COPYRIGHT` (v1.1 only). Many slots (2–5, 9, 11–13, 22–35, 38–52) are unnamed or unused.
 
-**Unused jump-table slots are the natural home for new Gym screens.** No new dispatch mechanism is
+**Unused jump-table slots are the natural home for new Lab screens.** No new dispatch mechanism is
 needed.
 
-### 3.4 Memory map — where Gym state can live
+### 3.4 Memory map — where Lab state can live
 
 **HRAM `$FF80–$FFFC`** is essentially full (2 bytes free). Key variables:
 
@@ -386,7 +386,7 @@ affordable.
 link map reports no free space. The gaps above are real; they are simply not expressed as separate
 sections. Re-splitting `include/wram.s` into named sections is a small, safe, high-value early task.)*
 
-### 3.5 The randomizer — the single most important subsystem for a Gym
+### 3.5 The randomizer — the single most important subsystem for a Lab
 
 **Single player uses the hardware divider register `rDIV` (`$FF04`), not a seeded PRNG.**
 
@@ -530,7 +530,7 @@ VBlankInterrupt: serial send -> VBlank_HandleLineClearBlink
 
 DMG VBlank is ~4 560 dot-cycles (~1.09 ms, ~1 140 CPU cycles at 1 MHz M-cycles). Any new HUD
 rendering competes with this. **New per-frame rendering is the scarcest resource in the project** —
-scarcer than ROM (which we can expand) or WRAM (which has 4.5 KB free). Design Gym HUDs to write
+scarcer than ROM (which we can expand) or WRAM (which has 4.5 KB free). Design Lab HUDs to write
 few tiles per frame, or to write only on change.
 
 ---
@@ -582,17 +582,17 @@ Original Game Boy Tetris is a DMG game: four shades of grey, no colour. The fami
 Tetris palette people see comes from the **Game Boy Color boot ROM**, which colourises
 Nintendo-published DMG games automatically.
 
-**The first thing you notice on running the expanded Gym build in mGBA is that it turns
+**The first thing you notice on running the expanded Lab build in mGBA is that it turns
 greyscale.** That is an emulator artefact, not a ROM problem:
 
 * The CGB boot ROM's palette lookup uses only the **16 title bytes** (`$0134-$0143`), the byte at
   `$0137` to break ties, and the **old licensee code** at `$014B` (must be `$01` = Nintendo).
-  All are **byte-identical** between our stock and Gym builds — title checksum `$DB`, 4th
+  All are **byte-identical** between our stock and Lab builds — title checksum `$DB`, 4th
   character `R`, licensee `$01`. Nothing the MBC1 conversion touches (`$0147`-`$0149`, `$014D`,
   `$014F`) is an input to that algorithm.
 * **mGBA does not use that algorithm.** It ships a No-Intro game database at
   `share/mgba/nointro.dat` and matches ROMs by **CRC32**. Our stock build matches
-  `Tetris (World) (Rev 1).gb  crc 46df91ad` exactly; the Gym build's CRC `5C61448D` is not in the
+  `Tetris (World) (Rev 1).gb  crc 46df91ad` exactly; the Lab build's CRC `5C61448D` is not in the
   database, so mGBA falls back to greyscale.
 
 **Fix for testing:** in mGBA, *Settings → Game Boy → Game Boy model → **Game Boy Color***. That
@@ -623,7 +623,7 @@ the boot ROM algorithm will show grey — expect users to report this, and docum
   modified ROM can *run* on a retail cart. That is wrong. A **Game Boy Game Genie patches cartridge
   reads at runtime**, so a small hack can run on a genuine unmodified cartridge — limited to
   **three codes**. GB Tetris hackers actively design within that budget (*"I'm trying to keep
-  everything within 3 GG codes so it works on hardware"* — mathmaster13). A Gym cannot fit in three
+  everything within 3 GG codes so it works on hardware"* — mathmaster13). A Lab cannot fit in three
   codes, so this is not a route for us, but **we must not claim it is impossible**: the community
   places real weight on original hardware, and the trade-off will be debated. A flash cart is the price of Game Boy ROM hacking in general,
   not of our expansion decision. What D5 actually costs is narrower: a DIY repro cartridge now needs
@@ -656,8 +656,8 @@ the boot ROM algorithm will show grey — expect users to report this, and docum
 | Authenticity | **Perfect by construction.** Gameplay is the original machine code, bit for bit. Every timing, every quirk, the biased randomizer, the 16-of-18-rows behaviour — all preserved without effort, because they are not reimplemented. |
 | Development effort | Low for state-manipulation features (most of them). Higher for new UI. |
 | Technical difficulty | Moderate. SM83 assembly, careful VBlank discipline, bank switching. |
-| Preserving original gameplay | **Trivially verifiable**: rebuild with all Gym features compiled out and `sha1sum` against the reference. A regression is a hash mismatch. |
-| Adding Gym functionality | Good. Free WRAM, free jump-table slots, an existing deterministic piece path, an existing soft reset, existing demo recording. |
+| Preserving original gameplay | **Trivially verifiable**: rebuild with all Lab features compiled out and `sha1sum` against the reference. A regression is a hash mismatch. |
+| Adding Lab functionality | Good. Free WRAM, free jump-table slots, an existing deterministic piece path, an existing soft reset, existing demo recording. |
 | Debugging | Excellent. BGB/Emulicious/SameBoy have full symbolic debuggers and consume `rgblink`'s `.sym` output directly. |
 | Maintainability | Assembly is verbose, but the base is heavily commented and organised per subsystem. |
 | Extensibility | Good once the bank/hook architecture is in place. |
@@ -737,7 +737,7 @@ directly in `docs/architecture.md` (§ build system) and `CLAUDE.md`.
   2. **Verify, don't ship.** CI can assert the byte-exact hash without publishing the artifact.
 * **Do not distribute** rebuilt original ROMs, modified ROMs, or ROM data in any release, issue,
   or artifact.
-* Recommended repository licensing: **MIT for our own Gym code** (compatible with the upstream
+* Recommended repository licensing: **MIT for our own Lab code** (compatible with the upstream
   MIT-licensed disassembly), with a prominent `README` notice about the upstream content's status
   and an explicit "you must supply your own ROM" instruction.
 
@@ -753,9 +753,9 @@ directly in `docs/architecture.md` (§ build system) and `CLAUDE.md`.
 | 4 | Whether v1.0's SHA-1 `3c1e0dd0…` is the canonical value (only MD5 is cross-referenced by multiple repos). | Cross-check against No-Intro DAT. Low priority — we target v1.1. |
 | 5 | Whether the speedrun.com community mandates a ROM version. | Ask in their Discord / forum. Affects whether a v1.0 build variant is worth supporting. |
 | 6 | Exact VBlank cycle headroom for a new HUD. | Measure with BGB's cycle counter or an Emulicious script on a build with a stub HUD. |
-| 7 | Whether SGB / GBC (`$143`, palettes) behaviour changes anything for a Gym HUD. | Test the built ROM on CGB in SameBoy. Low priority. |
+| 7 | Whether SGB / GBC (`$143`, palettes) behaviour changes anything for a Lab HUD. | Test the built ROM on CGB in SameBoy. Low priority. |
 | 8 | `alexsteb`'s 91.5 % divergence — is it a broken build on my part, or a genuinely inexact disassembly? | Not worth resolving; the repo is not a candidate. Recorded for completeness. |
-| 9 | **Whether a "shiftable disassembly" already exists in the community.** Tolstoj referenced efforts toward one in 2022; nitro2k01 was building a disassembly to his own standard and was positive about a gym. | Ask in the channel before duplicating. A shiftable base — where inserting code relocates everything cleanly — is more useful for a Gym than `vinheim3`'s address-fixed sections, and may change D3. |
+| 9 | **Whether a "shiftable disassembly" already exists in the community.** Tolstoj referenced efforts toward one in 2022; nitro2k01 was building a disassembly to his own standard and was positive about a lab. | Ask in the channel before duplicating. A shiftable base — where inserting code relocates everything cleanly — is more useful for a Lab than `vinheim3`'s address-fixed sections, and may change D3. |
 | 10 | Exact timer start/stop semantics of the existing 40-line qual ROM. Tolstoj: *"stops the timer one frame after the piece locks"*; an older revision had a hex frame counter running to `$3C`, making old and new times differ by ~1.7 s. | Ask Pascal/Tolstoj (`docs/community-research.md` §7 A15). Our timer must agree to the frame or results are not comparable. |
 
 ---

@@ -14,9 +14,9 @@
 | **D3** | **Foundation: [`vinheim3/tetris-gb-disasm`](https://github.com/vinheim3/tetris-gb-disasm), vendored into `src/original/`.** | MIT-licensed, 100 % coverage, heavily commented, per-subsystem files — and **it built byte-exact here on the first attempt with zero patches**. `docs/research.md` §2.2. |
 | **D4** | **Pin RGBDS v0.6.1**, vendored by URL + SHA-256, not installed system-wide. | The repo targets it and it is verified working. RGBDS 1.0 removed pre-1.0 `EQU` syntax and breaks every GB Tetris disassembly. Toolchain drift is the most likely cause of upstream issue #6. |
 | **D5** | **Expand the cartridge to MBC1, 64 KB ROM (4 banks), 8 KB battery SRAM** (cart type `$03`). **PROVISIONAL — see D9.** | The original 32 KB ROM has **~400 usable free bytes**. This is arithmetic, not preference. The original already writes `1` to `$2000`, so MBC1 conversion is nearly free. Note this is *not* a copy of TetrisGYM: retail NES Tetris is already MMC1 and TetrisGYM's default build fits inside its original 32 KB. We have far less slack. `docs/research.md` §4.1–4.2. |
-| **D6** | **Banks 0 and 1 remain byte-identical to the original except for a small, enumerated hook table.** Every Gym byte lives in bank 2+. | Makes "did we change the original game?" a mechanical question answerable by `cmp`, and keeps the release BPS patch small and auditable. |
+| **D6** | **Banks 0 and 1 remain byte-identical to the original except for a small, enumerated hook table.** Every Lab byte lives in bank 2+. | Makes "did we change the original game?" a mechanical question answerable by `cmp`, and keeps the release BPS patch small and auditable. |
 | **D7** | **Distribute a BPS patch only. Never publish a `.gb`.** | The ROM is copyrighted. `docs/research.md` §7. |
-| **D8** | **Gym code is authored in RGBDS assembly; build orchestration and asset tooling in Python 3 (stdlib only).** | Python 3 is already present on typical dev machines and in CI; `make`/`gcc` are not universally available. Keeps `git clone && python3 build.py` working with no system-wide installs. |
+| **D8** | **Lab code is authored in RGBDS assembly; build orchestration and asset tooling in Python 3 (stdlib only).** | Python 3 is already present on typical dev machines and in CI; `make`/`gcc` are not universally available. Keeps `git clone && python3 build.py` working with no system-wide installs. |
 | **D9** | **SRAM is optional at build time (`--no-sram`), and the mapper choice is not final until the cart-production board is known.** | The GBTetris Discord intends to produce physical carts once SPS + extended level select exist (`docs/community-research.md` §3.4). That makes the cartridge a **design input we can influence**, not a constraint imposed on users. Batteries add BOM cost and die; savestates and persisted config must degrade to session-only without SRAM, and the ROM must boot without it. MBC5 may be cheaper than MBC1 on modern repro boards — **confirm with Gunter before locking D5** (§7 A10). |
 
 ---
@@ -24,7 +24,7 @@
 ## 2. Repository layout
 
 ```
-tetris-gym-gb/
+tetris-lab-gb/
 ├── CLAUDE.md                  project principles; read this first
 ├── CONTRIBUTING.md            branch-and-PR workflow, what CI checks
 ├── build.py                   the entire build; no make, no gcc
@@ -41,8 +41,8 @@ tetris-gym-gb/
 │   ├── hooks/                 the only edits to original banks
 │   │   ├── hooks.inc          the declared hook table
 │   │   └── trampoline.inc     FarCall and the state-dispatch stub
-│   └── gym/
-│       ├── gym.asm            dispatch, level picker, instant restart, Gym RAM
+│   └── lab/
+│       ├── lab.asm            dispatch, level picker, instant restart, Lab RAM
 │       ├── random.asm         the SPS LFSR (lives in bank 1's empty space)
 │       ├── gravity.inc        extended 23-entry gravity table
 │       ├── levels.inc         shared level constants
@@ -63,13 +63,13 @@ tetris-gym-gb/
 └── build/                     gitignored: toolchain/, obj/, *.gb, *.sym, *.map
 ```
 
-`src/gym/` is flat while it is small. Split it into subdirectories when a
+`src/lab/` is flat while it is small. Split it into subdirectories when a
 directory would hold more than a handful of files, not before.
 
 
 ---
 
-## 3. The boundary between original code and Gym code
+## 3. The boundary between original code and Lab code
 
 This is the most important structural rule in the project.
 
@@ -91,10 +91,10 @@ hook-budget test.
 
 ### 3.2 Hooks: the only writes into original banks
 
-A **hook** replaces a small number of bytes in bank 0 or 1 with a call into Gym code. Every hook:
+A **hook** replaces a small number of bytes in bank 0 or 1 with a call into Lab code. Every hook:
 
 * is declared in `src/hooks/hooks.inc` with its address, byte length, and purpose;
-* is guarded by `IF DEF(GYM)` so a `GYM=0` build reproduces the original ROM exactly;
+* is guarded by `IF DEF(LAB)` so a `LAB=0` build reproduces the original ROM exactly;
 * is counted by `tests/test_original.py`, which asserts the total number of changed bytes in banks
   0–1 matches the declared hook table **exactly** — no undeclared drift.
 
@@ -102,9 +102,9 @@ A **hook** replaces a small number of bytes in bank 0 or 1 with a call into Gym 
 ; src/hooks/hooks.inc  (illustrative)
 ;
 ;   name              addr    len  purpose
-;   HOOK_SPAWN_PIECE  $2xxx    3   redirect piece selection to the Gym sequencer
-;   HOOK_VBLANK_END   $0xxx    3   render the Gym HUD after the original VBlank work
-;   HOOK_STATE_TABLE  $0xxx    2   point an unused hGameState slot at the Gym menu
+;   HOOK_SPAWN_PIECE  $2xxx    3   redirect piece selection to the Lab sequencer
+;   HOOK_VBLANK_END   $0xxx    3   render the Lab HUD after the original VBlank work
+;   HOOK_STATE_TABLE  $0xxx    2   point an unused hGameState slot at the Lab menu
 ;   HOOK_SOFT_RESET   $0xxx    3   restart the current trainer instead of rebooting
 ```
 
@@ -121,11 +121,11 @@ project's scarcest and most dangerous resource; every one is a place original be
 
 | Bank | Contents | Editable? |
 | --- | --- | --- |
-| 0 (`$0000–$3FFF`) | Original code + header + **Gym trampoline** in reclaimed filler | Hooks only |
+| 0 (`$0000–$3FFF`) | Original code + header + **Lab trampoline** in reclaimed filler | Hooks only |
 | 1 (`$4000–$7FFF`) | Original bank 1 (demo data, sound engine) | Hooks only |
-| 2 | Gym core: menu, state machine, sequencer, HUD | Free |
-| 3 | Gym trainers (`modes/`) | Free |
-| 4 | Gym data: preset boards, tilemaps, strings | Free |
+| 2 | Lab core: menu, state machine, sequencer, HUD | Free |
+| 3 | Lab trainers (`modes/`) | Free |
+| 4 | Lab data: preset boards, tilemaps, strings | Free |
 | 5–7 | Reserved for growth | Free |
 
 Banked calls use a standard trampoline that saves the current bank, switches, calls, and restores:
@@ -172,7 +172,7 @@ that table rather than defended against — see `docs/decisions/0006`.
 | Range | Size | Assigned to |
 | --- | --- | --- |
 | `$D762–$D8C0` | 351 B | **A-type high scores, levels A–M** — 13 slots continuing `wATypeHighScores` |
-| `$D8C1–$DCC0` | 1 024 B | **Gym core state** — active trainer, config, timer, statistics, HUD dirty flags |
+| `$D8C1–$DCC0` | 1 024 B | **Lab core state** — active trainer, config, timer, statistics, HUD dirty flags |
 | `$DCC1–$DF6F` | 687 B | free |
 
 Smaller unlabelled gaps exist lower in WRAM (`$C0DF–$C1FF`, and upstream notes that
@@ -183,7 +183,7 @@ Upstream declares WRAM as one monolithic section, so the linker reports no free 
 split that exposes the gap is deviation #2 in `src/original/UPSTREAM.md`; it moves no label and, since
 WRAM is not in the ROM image, cannot change output.
 
-**Rule: Gym code never writes outside its declared ranges.** A test asserts the Gym sections do not
+**Rule: Lab code never writes outside its declared ranges.** A test asserts the Lab sections do not
 overlap any original section.
 
 ### 4.2 The piece sequencer — reuse, don't replace
@@ -213,7 +213,7 @@ Two caveats to handle explicitly:
 | Range | Contents |
 | --- | --- |
 | `$A000–$A00F` | Magic + version + checksum. **Refuse to load mismatched saves; re-initialise instead.** |
-| `$A010–$A0FF` | Persistent Gym config (last trainer, level, heart flag, DAS values, seed) |
+| `$A010–$A0FF` | Persistent Lab config (last trainer, level, heart flag, DAS values, seed) |
 | `$A100–$A7FF` | Savestate slots (a 10×18 board snapshot is 180 B, so ~8 slots with metadata is comfortable) |
 | `$A800–$BFFF` | Reserved |
 
@@ -226,9 +226,9 @@ The original VBlank handler is already near-full: 18 unrolled row-shift calls, O
 scoring screen, the highscore tilemap and a conditional two-map score render, in ~1.09 ms
 (`docs/research.md` §3.8).
 
-**Rules for all Gym rendering:**
+**Rules for all Lab rendering:**
 
-1. Gym HUD rendering runs from **one hook at the end of the original VBlank handler**, never from
+1. Lab HUD rendering runs from **one hook at the end of the original VBlank handler**, never from
    multiple places.
 2. Render from a **dirty-flag queue**: main-loop code stages tile writes into a small WRAM buffer
    and sets a flag; VBlank drains at most **N tiles per frame** (start with N = 16 and measure).
@@ -248,9 +248,9 @@ limit is the constraint there, not time.
 `python3 build.py` and nothing else. No `make`, no `gcc`, no system-wide installs.
 
 ```
-python3 build.py                 # default: GYM=1, MBC1, 64 KB, SRAM
-python3 build.py --original      # GYM=0: reproduce v1.1 byte-exact  (the regression test)
-python3 build.py --patch         # additionally emit build/tetrisgym.bps  (needs a user ROM)
+python3 build.py                 # default: LAB=1, MBC1, 64 KB, SRAM
+python3 build.py --original      # LAB=0: reproduce v1.1 byte-exact  (the regression test)
+python3 build.py --patch         # additionally emit build/tetrislab.bps  (needs a user ROM)
 python3 build.py --freespace     # print per-bank free bytes from the link map
 ```
 
@@ -263,13 +263,13 @@ Stages:
    expected byte count**, asserting the result. (Both `kaspermeerts` and `meithecatte` need this;
    `kaspermeerts` fails to build without it, and getting it wrong produces a confusing
    "section overlaps" link error. `docs/research.md` §6.)
-3. **Assemble** — `rgbasm` per translation unit, with `-D GYM=1` / `-D GYM=0` selecting hooks.
+3. **Assemble** — `rgbasm` per translation unit, with `-D LAB=1` / `-D LAB=0` selecting hooks.
 4. **Link** — `rgblink -m build/tetris.map -n build/tetris.sym`. **Both outputs are mandatory**:
    the map drives free-space accounting, the sym file drives symbolic debugging and the test harness.
 5. **Fix** — `rgbfix` sets cartridge type, ROM/RAM size and checksums.
 6. **Verify** — always: hash the ROM; assert banks 0–1 differ from the reference only at declared
    hook addresses; print per-bank free space.
-7. **Patch** (opt-in) — `--patch` emits `build/tetrisgym.bps` and verifies it round-trips. The
+7. **Patch** (opt-in) — `--patch` emits `build/tetrislab.bps` and verifies it round-trips. The
    source is our own byte-exact rebuild of the stock ROM, so cutting a release needs no copy of
    it; only *using* a release does.
 
@@ -309,13 +309,13 @@ regardless of how good it looks.
 
 ### Layer 2 — Original-bank diff
 
-Build with `GYM=1`, diff banks 0–1 against the reference, and assert the set of differing byte
+Build with `LAB=1`, diff banks 0–1 against the reference, and assert the set of differing byte
 addresses equals exactly the declared hook table. Catches accidental drift into original code —
 the failure mode most likely to silently change gameplay.
 
 ### Layer 3 — Static/link assertions
 
-* Gym WRAM sections do not overlap original sections.
+* Lab WRAM sections do not overlap original sections.
 * Per-bank free space stays above a floor (fail the build before the linker does, with a better
   message).
 * Expected graphics sizes match.
@@ -374,11 +374,11 @@ architecture.
 
 ## 8. Extension model — adding a feature
 
-1. Write the code in `src/gym/`. Keep it in bank 2 unless it must be reachable
+1. Write the code in `src/lab/`. Keep it in bank 2 unless it must be reachable
    while bank 1 is mapped, in which case use bank 1's empty space (as
    `random.asm` does) or a bank-0 stub.
 2. If it needs to run inside an original state, route that state's jump-table
-   entry through `GymStateHook` and branch in `GymDispatch`.
+   entry through `LabStateHook` and branch in `LabDispatch`.
 3. **If it changes bytes in banks 0 or 1**, declare the range in
    `src/hooks/hooks.inc`, mirror it in `tests/test_expansion.py`, record it in
    `src/original/UPSTREAM.md`, and justify it in the PR. Those get extra review.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The Gym menu, and the transition trainer it launches.
+"""The Lab menu, and the transition trainer it launches.
 
-    .venv/bin/python tests/test_gymmenu.py
+    .venv/bin/python tests/test_labmenu.py
 
 The menu replaces the original A-TYPE/B-TYPE screen. See docs/decisions/0007.
 """
@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 from tools.emu import (Tetris, sym, hATypeLevel,  # noqa: E402
                        hNumLinesCompletedBCD, GS_IN_GAME_MAIN)
 
-ROM = "build/tetrisgym.gb"
+ROM = "build/tetrislab.gb"
 
 GS_GAME_TYPE_MAIN = 0x07      # the menu lives on the title screen's state
 GS_A_TYPE_SELECTION_MAIN = 0x11
@@ -32,7 +32,7 @@ MUSIC_A, MUSIC_OFF = 0x1C, 0x1F
 MODE_TETRIS, MODE_BTYPE, MODE_2PLAYER = 0, 1, 2
 MODE_TRANSITION, MODE_SEED, MODE_MUSIC = 3, 4, 5
 
-wGymMode = sym("wGymMode")
+wLabMode = sym("wLabMode")
 
 TILE_BLANK = 0x2F
 
@@ -70,10 +70,10 @@ def to_menu_row(t, row):
 def goto_row(t, row):
     """Move the cursor to a row from wherever it currently is."""
     for _ in range(MODE_MUSIC + 1):
-        if t[wGymMode] == row:
+        if t[wLabMode] == row:
             return t
-        t.press("down" if t[wGymMode] < row else "up")
-    raise AssertionError(f"stuck on row {t[wGymMode]} heading for {row}")
+        t.press("down" if t[wLabMode] < row else "up")
+    raise AssertionError(f"stuck on row {t[wLabMode]} heading for {row}")
 
 
 def test_boot_reaches_the_title_without_the_copyright_wait():
@@ -89,7 +89,7 @@ def test_boot_reaches_the_title_without_the_copyright_wait():
         assert frames < 200, f"took {frames} frames ({frames / 59.7:.1f}s) to boot"
 
 
-# The parts of GameState06_TitleScreenInit ($03AE) the Gym menu's init has to do
+# The parts of GameState06_TitleScreenInit ($03AE) the Lab menu's init has to do
 # itself, and where they are in the stock ROM. Everything else that init does is
 # drawing the title, which the menu replaces.
 TRANSCRIBED_FROM_06 = [
@@ -108,13 +108,13 @@ def test_the_title_init_is_transcribed_not_rewritten():
     the game hangs somewhere else entirely. Asserting the bytes rather than the
     behaviour is what stops that drifting again."""
     stock = (ROOT / "build/tetris.gb").read_bytes()
-    gym = (ROOT / ROM).read_bytes()
+    lab = (ROOT / ROM).read_bytes()
 
     where = []
     for name, lo, hi in TRANSCRIBED_FROM_06:
         seq = stock[lo:hi + 1]
-        at = gym.find(seq, 0x8000)
-        assert at >= 0, f"{name} (${lo:04X}-${hi:04X}) is not in the Gym banks verbatim"
+        at = lab.find(seq, 0x8000)
+        assert at >= 0, f"{name} (${lo:04X}-${hi:04X}) is not in the Lab banks verbatim"
         where.append((name, at, len(seq)))
 
     # ... and in order, with nothing spliced between them.
@@ -161,7 +161,7 @@ def test_settings_survive_a_round_trip_through_a_game():
             t.press("up")                      # first digit -> A
         t.press("a")
 
-        level, seed = t[sym("wGymDrillLevel")], t[sym("wGymSeedHi")]
+        level, seed = t[sym("wLabDrillLevel")], t[sym("wLabSeedHi")]
         assert level == 7 and seed, f"setup failed: level {level}, seed hi ${seed:02X}"
 
         goto_row(t, MODE_TETRIS)
@@ -171,8 +171,8 @@ def test_settings_survive_a_round_trip_through_a_game():
         t.press("b")
         t.tick(40)
 
-        assert t[sym("wGymDrillLevel")] == level, "the transition level was reset"
-        assert t[sym("wGymSeedHi")] == seed, "the seed was reset"
+        assert t[sym("wLabDrillLevel")] == level, "the transition level was reset"
+        assert t[sym("wLabSeedHi")] == seed, "the seed was reset"
 
 
 def test_the_original_title_screen_never_appears():
@@ -214,13 +214,13 @@ def test_gameplay_survives_the_replaced_title_init():
 
 
 def test_the_level_select_renders_like_the_stock_rom():
-    """The menu tileset comes from bank 1, so the Gym has to far-call for it -
+    """The menu tileset comes from bank 1, so the Lab has to far-call for it -
     without that the level select drew the title screen's tiles as garbage."""
-    with Tetris(ROM) as gym, Tetris("build/tetris.gb") as stock:
-        gym.to_level_select(); gym.tick(30)
+    with Tetris(ROM) as lab, Tetris("build/tetris.gb") as stock:
+        lab.to_level_select(); lab.tick(30)
         stock.to_level_select(); stock.tick(30)
         differing = [(r, c) for r in range(18) for c in range(20)
-                     if gym[0x9800 + r * 32 + c] != stock[0x9800 + r * 32 + c]]
+                     if lab[0x9800 + r * 32 + c] != stock[0x9800 + r * 32 + c]]
         assert len(differing) <= 1, (
             f"{len(differing)} cells differ from the stock level select: {differing[:8]}"
         )
@@ -241,7 +241,7 @@ def test_the_menu_replaces_the_game_type_screen():
         to_menu(t)
         rows = [text(t, r) for r in range(18)]
         joined = "\n".join(rows)
-        for want in ("TETRIS GYM", "TETRIS", "B-TYPE", "2 PLAYER",
+        for want in ("TETRIS LAB", "TETRIS", "B-TYPE", "2 PLAYER",
                      "TRANSITION", "SEED", "MUSIC"):
             assert want in joined, f"{want!r} missing from the menu:\n{joined}"
         assert "1PLAYER" not in joined, "the original title screen is still showing"
@@ -250,11 +250,11 @@ def test_the_menu_replaces_the_game_type_screen():
 def test_the_cursor_moves_and_wraps():
     with Tetris(ROM) as t:
         to_menu(t)
-        assert t[wGymMode] == MODE_TETRIS, "should open on the first row"
+        assert t[wLabMode] == MODE_TETRIS, "should open on the first row"
         t.press("up")
-        assert t[wGymMode] == MODE_MUSIC, "Up from the first row should wrap"
+        assert t[wLabMode] == MODE_MUSIC, "Up from the first row should wrap"
         t.press("down")
-        assert t[wGymMode] == MODE_TETRIS, "Down from the last row should wrap"
+        assert t[wLabMode] == MODE_TETRIS, "Down from the last row should wrap"
 
 
 def test_tetris_launches_the_a_type_level_select():
@@ -276,14 +276,14 @@ def test_b_type_launches_the_b_type_level_select():
 def test_the_seed_row_opens_its_digits_with_a():
     with Tetris(ROM) as t:
         to_menu_row(t, MODE_SEED)
-        idle = t[sym("wGymSeedDigit")]
+        idle = t[sym("wLabSeedDigit")]
         assert idle == 0xFF, f"should start closed, got {idle}"
         t.press("a")
-        assert t[sym("wGymSeedDigit")] == 0, "A should open the first digit"
+        assert t[sym("wLabSeedDigit")] == 0, "A should open the first digit"
         t.press("right")
-        assert t[sym("wGymSeedDigit")] == 1, "Right should step to the next digit"
+        assert t[sym("wLabSeedDigit")] == 1, "Right should step to the next digit"
         t.press("a")
-        assert t[sym("wGymSeedDigit")] == 0xFF, "A should close the digits"
+        assert t[sym("wLabSeedDigit")] == 0xFF, "A should close the digits"
         assert t.state == GS_GAME_TYPE_MAIN, "A on a setting started something"
 
 
@@ -312,7 +312,7 @@ def _run_drill(t, level):
     to_menu_row(t, MODE_TRANSITION)
     for _ in range(level):
         t.press("right")
-    assert t[sym("wGymDrillLevel")] == level, "the row did not take the level"
+    assert t[sym("wLabDrillLevel")] == level, "the row did not take the level"
     t.press("start")
     t.run_until_state(GS_IN_GAME_MAIN)
     t.tick(25)

@@ -14,9 +14,9 @@ current.
 | 4 — Replay, tooling and polish | not started |
 | 5 — Hardware validation and 1.0 | not started |
 
-**Released:** `v0.2.0`, 2026-08-21 — the Gym menu and the first trainer.
+**Released:** `v0.2.0`, 2026-08-21 — the Lab menu and the first trainer.
 Still an alpha, and still ahead of the Milestone 2 gate below. BPS patch on
-[Releases](https://github.com/Giovanniclini/tetris-gym-gb/releases).
+[Releases](https://github.com/Giovanniclini/tetris-lab-gb/releases).
 
 Outstanding across finished milestones:
 
@@ -88,16 +88,16 @@ toolchain pinning; upstream issue #6.
    `hCurrentBank` at `$FFFD`.
 3. Split `src/original/include/wram.s` into named per-purpose sections so the linker reports real
    free space. **Must not change a single output byte.**
-4. Declare empty Gym sections in banks 2–7 and the Gym WRAM/SRAM ranges.
+4. Declare empty Lab sections in banks 2–7 and the Lab WRAM/SRAM ranges.
 5. `tests/test_original.py` grows Layer 2: diff banks 0–1 against the reference, assert the changed
    byte set equals the declared hook table (initially: the trampoline only).
 
 **Acceptance criteria**
 - [x] Banks 0–1 differ from the reference **only** at the declared, enumerated addresses
       (27 bytes: 22 trampoline + 3 header + 2 checksum), asserted by `tests/test_expansion.py`
-- [x] `--original` still produces the byte-exact ROM (the `GYM=0` path is unaffected)
+- [x] `--original` still produces the byte-exact ROM (the `LAB=0` path is unaffected)
 - [x] Cartridge is MBC1 + 8 KB battery SRAM; `--no-sram` variant also builds (D9)
-- [x] Banks 2–3 exist with ~16 KB free each; Gym WRAM claimed from the verified gap
+- [x] Banks 2–3 exist with ~16 KB free each; Lab WRAM claimed from the verified gap
 - [ ] `FarCall` into a stub in bank 2 and back works, verified in an emulator
       *(trampoline assembled and byte-checked; execution needs the M1 harness)*
 - [ ] SRAM survives a power cycle on real hardware *(needs a flash cart)*
@@ -109,7 +109,7 @@ toolchain pinning; upstream issue #6.
 **Status 2026-08-20: structurally complete, awaiting behavioural verification.**
 
 **ROM size revised to 64 KB (4 banks), not the 128 KB in D5.** Size the cartridge to what we
-actually use: banks 2–3 give ~32 KB of Gym space against a current usage of a few dozen bytes, and
+actually use: banks 2–3 give ~32 KB of Lab space against a current usage of a few dozen bytes, and
 a smaller ROM is a cheaper cartridge — which matters, because the community intends to have carts
 produced (`docs/community-research.md` §3.5.7). Growing later is a one-line change.
 
@@ -134,14 +134,14 @@ unambiguous.
 >   *buildable, tested, maintainable* base, which is precisely what broke when Tolstoj tried to
 >   restructure KLM (§3.5.8).
 
-## Milestone 1 — First Gym functionality: level select + instant restart
+## Milestone 1 — First Lab functionality: level select + instant restart
 
 **Goal:** the smallest change that is *already useful*, and that proves the whole hook/menu/bank
 architecture end to end.
 
 Chosen because these are ranked #2 and #3 in `docs/community-research.md` §6, cost almost nothing
 (both are near-trivial given the original's structure), and exercise every architectural element:
-a menu screen in an unused `hGameState` slot, a hook, banked code, and Gym WRAM.
+a menu screen in an unused `hGameState` slot, a hook, banked code, and Lab WRAM.
 
 **They are also not a convenience feature.** Measured in `docs/research.md` §3.7: the original makes
 only levels 0–9 selectable; heart levels are armed by an undocumented `Down`+`Start` at the *title
@@ -152,7 +152,7 @@ chosen practice speed takes roughly 15 seconds and a remembered button combinati
 is the difference between one attempt and twenty.
 
 **Work**
-1. Gym menu on an unused `hGameState` jump-table slot, reachable from the title screen.
+1. Lab menu on an unused `hGameState` jump-table slot, reachable from the title screen.
 2. **Start on any level 0–22 (0–9, A–M) with a heart-level toggle** — write `hATypeLevel` and the
    gravity reload value from the table at `$1B06`.
    **Scope restored to A–M**: KLM has been reverse engineered (`docs/existing-hacks.md` §3), so L
@@ -161,7 +161,7 @@ is the difference between one attempt and twenty.
    extends with no table change. Match KLM exactly; verify L scores 26 400 per Tetris.
 3. **Instant restart**: retarget the existing `A+B+Select+Start` soft reset to restart the current
    trainer with identical settings instead of rebooting.
-4. Gym config persisted to SRAM; restored on boot.
+4. Lab config persisted to SRAM; restored on boot.
 5. Headless emulator harness (`tools/emu.py`) + first behavioural tests. **Record the emulator choice
    as an ADR** (`docs/decisions/`).
 
@@ -196,7 +196,7 @@ come from `rDIV` as they always did.
 **Status 2026-08-21:** levels A–M have their own high-score slots, so a score is
 filed and shown under the level it was played at (`docs/decisions/0006`).
 
-**Status 2026-08-21:** the A-TYPE/B-TYPE screen is now the Gym menu, modelled on
+**Status 2026-08-21:** the A-TYPE/B-TYPE screen is now the Lab menu, modelled on
 TetrisGYM's list, and carries the first trainer — TRANSITION
 (`docs/decisions/0007`).
 

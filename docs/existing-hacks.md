@@ -43,7 +43,7 @@ build. That is independent confirmation of two things: v1.1 is definitively the 
 
 **All seven are 32 768 bytes with an unchanged ROM-ONLY header.** Every hack in circulation is
 squeezed into the stock cartridge with no mapper — which is precisely why none of them can be a
-full Gym, and why our Milestone 0.5 expansion matters.
+full Lab, and why our Milestone 0.5 expansion matters.
 
 ## 3. KLM — level K/L/M
 
@@ -99,7 +99,7 @@ fixed it"*. He had.
 byte was one instruction past where the analysis stopped looking. Reading the
 operand is not reading the instruction.
 
-The Gym now makes the same change (`HOOK_LEVEL_CAP`), because it is better than
+The Lab now makes the same change (`HOOK_LEVEL_CAP`), because it is better than
 what we had: our own version compared against `MAX_LEVEL` and stopped only on
 equality with 22, so L still climbed to M.
 
@@ -135,7 +135,7 @@ screen, pick M.
 
 **Our fix is deliberately not in the formula.** Raising the ceiling would change how *normal* heart
 games behave — a heart game saturates at level-20 speed from in-game level 10 onward, and players
-rely on that. Instead the Gym simply does not offer hearts in the K-M bank, where they can never
+rely on that. Instead the Lab simply does not offer hearts in the K-M bank, where they can never
 help: at K they are a no-op and at L and M they only slow the game down. Hearts are cleared on
 entering that bank and Select is ignored there. Zero bytes of the original formula change.
 
@@ -144,7 +144,7 @@ entering that bank and Select is ignored there. Zero bytes of the original formu
 Adding levels L and M is one table extension. What it costs depends entirely on whether you are
 editing a binary or a disassembly.
 
-| | KLM | tetris-gym-gb |
+| | KLM | tetris-lab-gb |
 | --- | --- | --- |
 | Approach | Relocate the table to `$1AF1` to make room | Put a 23-entry table in reclaimed `$ff` padding, redirect the pointer |
 | Bytes changed in the original banks | **20 870** | **54** |
@@ -295,7 +295,7 @@ same seed, fresh boot   [64, 72, 144, 64, 56, 136]
 same seed, after a game [48, 64, 72, 144, 64, 56]
 ```
 
-Fixed by zeroing it in `GymArmSeed`, and only when a seed is armed, so unseeded
+Fixed by zeroing it in `LabArmSeed`, and only when a seed is armed, so unseeded
 play stays bit-identical to the original. `tests/test_sps.py` asserts a seeded
 sequence is unchanged by a game played before it.
 

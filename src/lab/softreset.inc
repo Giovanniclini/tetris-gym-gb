@@ -6,7 +6,7 @@
 ; the pause check that follows: Start is part of the combination, so returning
 ; normally would immediately pause the game we just restarted.
 
-GymResetStub::
-	ld   b, BANK(GymInGameReset)
-	ld   hl, GymInGameReset
+LabResetStub::
+	ld   b, BANK(LabInGameReset)
+	ld   hl, LabInGameReset
 	jp   FarCall

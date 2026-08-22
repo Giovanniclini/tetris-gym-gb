@@ -1,6 +1,6 @@
 """Apply, create and analyse UPS and BPS patches.
 
-    python3 tools/patch.py tetrisgym.bps "Tetris (World) (Rev A).gb"
+    python3 tools/patch.py tetrislab.bps "Tetris (World) (Rev A).gb"
 
 Applies a patch to a ROM you supply and writes the result beside it. This
 exists so that using a release needs nothing but Python 3 - the same promise
