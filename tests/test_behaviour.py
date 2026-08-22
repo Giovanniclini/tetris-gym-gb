@@ -171,6 +171,107 @@ def test_the_real_button_state_is_kept_when_down_is_suppressed():
             assert stashed, f"level {level}: the Lab lost the real button state"
 
 
+def test_the_score_passes_999999():
+    """Three BCD bytes hold six digits, and the original pins them all at $99
+    when the add carries out ($0178). That clamp is the ceiling of the storage,
+    not a rule - the community competes on KLM's uncapped score."""
+    from tools.emu import sym
+    wScoreBCD = 0xC0A0
+    wLabScoreMillions = sym("wLabScoreMillions")
+    BUF, W, EMPTY = 0xC800, 32, 0x2F
+
+    with Tetris("build/tetrislab.gb") as t:
+        t.start_game_at(9)
+        t.tick(120)
+        for i, v in enumerate((0x50, 0x99, 0x99)):      # 999,950
+            t.pb.memory[wScoreBCD + i] = v
+
+        for _ in range(1500):                            # wait for a piece to land
+            t.pb.tick()
+            if any(t[BUF + 17 * W + c] != EMPTY for c in range(2, 12)):
+                break
+        block = next(t[BUF + 17 * W + c] for c in range(2, 12)
+                     if t[BUF + 17 * W + c] != EMPTY)
+        for c in range(2, 12):                           # complete the row
+            t.pb.memory[BUF + 17 * W + c] = block
+            t.pb.memory[0x9800 + 17 * W + c] = block
+
+        for _ in range(900):
+            t.pb.tick()
+            if t[wLabScoreMillions]:
+                break
+
+        score = int(f"{t[wLabScoreMillions]:02X}{t[wScoreBCD+2]:02X}"
+                    f"{t[wScoreBCD+1]:02X}{t[wScoreBCD]:02X}")
+        assert score > 999999, f"score clamped at {score}"
+
+        t.tick(30)
+        # Seven digits at columns 13-19 of both maps: screen 0 for play, screen 1
+        # for the pause screen. Column 12 is the box border and stays put.
+        for base, which in ((0x9800, "screen 0"), (0x9C00, "screen 1")):
+            cells = [t[base + 3 * 32 + 13 + i] for i in range(7)]
+            assert cells[0] == t[wLabScoreMillions] & 0x0F, (
+                f"{which}: no seventh digit: {[hex(c) for c in cells]}"
+            )
+            assert all(c <= 9 for c in cells), (
+                f"{which}: leading zeros blanked, so the score reads wrong: "
+                f"{[hex(c) for c in cells]}"
+            )
+        assert t[0x9800 + 3 * 32 + 12] == 0x7B, "the score box border was overwritten"
+
+
+def test_the_score_is_right_aligned_in_the_spare_cell():
+    """The original ends the score at column 18 and leaves 19 blank. Drawing one
+    cell right uses that space, and means the number does not shift sideways
+    when it gains a seventh digit."""
+    with Tetris("build/tetrislab.gb") as t:
+        t.start_game_at(9)
+        t.tick(200)
+        for base in (0x9800, 0x9C00):
+            assert t[base + 3 * 32 + 19] <= 9, (
+                f"nothing in the spare cell at column 19: ${t[base + 3*32 + 19]:02X}"
+            )
+            assert t[base + 3 * 32 + 12] == 0x7B, "the box border was overwritten"
+
+
+def test_the_score_has_an_honest_ceiling():
+    """Seven digits is all there is room for - column 11 is inside the playfield
+    - so the score pins at 9,999,999 rather than counting into a digit it cannot
+    show. Refusing the carry alone is not enough: the add has already wrapped the
+    low six, so the score would *fall* from 9,999,950 to 9,000,350."""
+    from tools.emu import sym
+    wScoreBCD = 0xC0A0
+    wLabScoreMillions = sym("wLabScoreMillions")
+    BUF, W, EMPTY = 0xC800, 32, 0x2F
+
+    with Tetris("build/tetrislab.gb") as t:
+        t.start_game_at(9)
+        t.tick(120)
+        t.pb.memory[wLabScoreMillions] = 0x09
+        for i, v in enumerate((0x50, 0x99, 0x99)):     # 9,999,950
+            t.pb.memory[wScoreBCD + i] = v
+
+        for _ in range(1500):
+            t.pb.tick()
+            if any(t[BUF + 17 * W + c] != EMPTY for c in range(2, 12)):
+                break
+        block = next(t[BUF + 17 * W + c] for c in range(2, 12)
+                     if t[BUF + 17 * W + c] != EMPTY)
+        for c in range(2, 12):
+            t.pb.memory[BUF + 17 * W + c] = block
+            t.pb.memory[0x9800 + 17 * W + c] = block
+
+        for _ in range(900):
+            t.pb.tick()
+            if t[wScoreBCD + 2] != 0x99:
+                break
+        t.tick(20)
+
+        score = int(f"{t[wLabScoreMillions]:02X}{t[wScoreBCD+2]:02X}"
+                    f"{t[wScoreBCD+1]:02X}{t[wScoreBCD]:02X}")
+        assert score == 9999999, f"expected the ceiling, got {score}"
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":

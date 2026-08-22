@@ -138,6 +138,25 @@ Prefer fewer words. Concretely:
 
 This applies to commit messages, PR descriptions and replies as much as to files.
 
+### 7a. One concept, one commit
+
+A branch that does one thing lands as **one commit**. Fixing your own work in
+progress is not a second concept: four attempts at where a digit goes is still
+"uncap the score". Squash before pushing, or `git reset --soft main` and recommit
+if the branch already has a history.
+
+Split commits only when a branch genuinely carries **unrelated** concepts — a
+score uncap and a rocket-scene skip in the same PR is two commits, because
+either could be reverted without the other. Prefer separate PRs when that
+happens at all.
+
+What each commit message should carry is in §7: what changed, why, and what it
+cost to find. A squashed message is longer than any of the ones it replaces, and
+should be — it is the only record that survives.
+
+**Force-pushing a feature branch to squash it is fine.** Force-pushing `main` is
+not (§8).
+
 ### 8. Do not make destructive changes
 
 No force-pushes, no history rewrites, no deleting or wholesale-rewriting `src/original/`, no

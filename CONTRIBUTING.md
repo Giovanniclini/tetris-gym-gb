@@ -13,6 +13,11 @@ git push -u origin short-description
 gh pr create        # or open the PR in the browser
 ```
 
+**One concept, one commit.** A branch that does one thing lands as one commit —
+fixing your own work in progress is not a second concept. Squash before pushing.
+Separate commits are for genuinely unrelated changes that share a branch, and
+those are usually better as separate PRs. See `CLAUDE.md` §7a.
+
 CI must pass before merging. What it checks:
 
 | Check | Why it matters |

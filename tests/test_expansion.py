@@ -27,7 +27,13 @@ ALLOWED_RANGES = [
     (0x0307, 0x030C, "HOOK_STATE_TABLE_06/07/08 - the title screen is the Lab menu, "
                      "drawn by $06 so the original never appears; B from a level "
                      "select comes back to it"),
-    (0x6430, 0x644F, "LAB_BANK1_THUNK - loads the menu tileset, which lives in bank 1"),
+    (0x01E8, 0x01E8, "HOOK_SCORE_CELLS - score drawn one cell right, screen 0"),
+    (0x01F2, 0x01F2, "HOOK_SCORE_CELLS - score drawn one cell right, screen 1"),
+    (0x23AD, 0x23AD, "HOOK_SCORE_CELLS - score drawn one cell right, screen 1"),
+    (0x23C6, 0x23C6, "HOOK_SCORE_CELLS - score drawn one cell right, screen 0"),
+    (0x0178, 0x017A, "HOOK_SCORE_CAP - the 999,999 clamp redirected to a carry handler"),
+    (0x7FF6, 0x7FFF, "LAB_BANK1_GFX - the menu tileset thunk, in the gap past the sound thunks"),
+    (0x6430, 0x644F, "LAB_BANK1_THUNK - the score carry handler, reached during gameplay"),
     (0x030F, 0x0310, "HOOK_STATE_TABLE_0A - in-game init routed via the Lab"),
     (0x031B, 0x031E, "HOOK_STATE_TABLE - A-type selection states routed via the Lab"),
     (0x0325, 0x0326, "HOOK_STATE_TABLE_15 - name entry routed via the Lab"),

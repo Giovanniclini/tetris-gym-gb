@@ -287,9 +287,18 @@ AddScoreValueDEontoBaseScoreHL:
 	ldh  [hFoundDisplayableScoreDigit], a                           ; $0175
 	ret  nc                                                         ; $0177
 
-; if carry found in last byte, max score is 999,999
+; --- tetris-lab-gb deviation #19 (see src/original/UPSTREAM.md) ---
+; The clamp that pins the score at 999 999. Three BCD bytes hold six digits, and
+; this exists to stop them wrapping to zero - it is the ceiling of the storage,
+; not a rule. Replaced by a jump to a carry handler that keeps digits 7 and 8.
+; Three bytes for six; the remainder is left as it was and is unreachable.
+IF LAB
+	jp   LabScoreCarry
+ELSE
 	ld   a, $99                                                     ; $0178
 	ld   [hl-], a                                                   ; $017a
+ENDC
+; --- end deviation #19 ---
 	ld   [hl-], a                                                   ; $017b
 	ld   [hl], a                                                    ; $017c
 	ret                                                             ; $017d
@@ -354,12 +363,32 @@ VBlankInterruptHandler:
 	jr   nz, .end                                                   ; $01e5
 
 ; show score on screen 0 (if somehow forced), and screen 1
+; --- tetris-lab-gb deviation #20 (see src/original/UPSTREAM.md) ---
+; The score is drawn one cell right, so its units digit sits in the spare cell
+; at column 19 instead of leaving it blank. That frees column 13 for the seventh
+; digit, and means the number does not shift sideways when it passes a million.
+; One byte of the operand, at each of the four places the score is drawn.
+IF LAB
+	ld   hl, _SCRN0+$6e
+ELSE
 	ld   hl, _SCRN0+$6d                                             ; $01e7
+ENDC
+; --- end deviation #20 ---
 	call DisplayGameATypeScoreIfInGameAndForced                     ; $01ea
 
 	ld   a, $01                                                     ; $01ed
 	ldh  [hFoundDisplayableScoreDigit], a                           ; $01ef
+; --- tetris-lab-gb deviation #20 (see src/original/UPSTREAM.md) ---
+; The score is drawn one cell right, so its units digit sits in the spare cell
+; at column 19 instead of leaving it blank. That frees column 13 for the seventh
+; digit, and means the number does not shift sideways when it passes a million.
+; One byte of the operand, at each of the four places the score is drawn.
+IF LAB
+	ld   hl, _SCRN1+$6e
+ELSE
 	ld   hl, _SCRN1+$6d                                             ; $01f1
+ENDC
+; --- end deviation #20 ---
 	call DisplayGameATypeScoreIfInGameAndForced                     ; $01f4
 
 ; clear that we've just added drops to score

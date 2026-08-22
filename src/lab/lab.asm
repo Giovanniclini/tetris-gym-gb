@@ -110,7 +110,14 @@ wLabSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
 wLabButtonsHeld::    db
 wLabButtonsPressed:: db
 
-	ds 1007
+; Digits 7 and 8 of the score, BCD. The original's three bytes hold the low six
+; and wrap; this counts the carries. See LabScoreCarry in random.asm.
+wLabScoreMillions::  db
+
+; What the seventh-digit cell currently shows, so it is only repainted on change.
+wLabScoreCarryDrawn:: db
+
+	ds 1005
 wLabStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -213,6 +220,9 @@ LabDispatch::
 ; is the one place to load the configured seed into the LFSR. A restart must
 ; repeat the sequence, not continue it.
 .gameInit:
+	xor  a
+	ld   [wLabScoreMillions], a     ; the original clears its three bytes here too
+	ld   [wLabScoreCarryDrawn], a
 	call LabArmSeed
 	call LabArmDrill
 	ld   hl, GameState0a_InGameInit
@@ -314,6 +324,7 @@ LabDispatch::
 .inGameMain:
 	call LabDrillApply
 	call LabSuppressPushdown
+	call LabDrawScoreCarry
 	ld   hl, GameState00_InGameMain
 	ret
 
@@ -1398,6 +1409,116 @@ LabSuppressPushdown::
 	ldh  a, [hButtonsPressed]
 	res  PADB_DOWN, a
 	ldh  [hButtonsPressed], a
+	ret
+
+
+
+; ---------------------------------------------------------------------------
+; The seventh score digit
+;
+; The SCORE panel is six cells at row 3, columns 13-18, and column 12 is the
+; box's left edge - there is no seventh cell, which is why Tolstoj's ROMs put
+; this digit in a sprite.
+;
+; A sprite does not work here: its colour 0 is transparent, so a dark digit on
+; the panel's dark surround is invisible. A background tile carries its own
+; light backing, so writing column 12 makes the box look one cell wider and the
+; digit reads normally. Restored to the edge tile when the score is under a
+; million.
+;
+; Written through LabPutTile, so it waits for the LCD like everything else.
+; ---------------------------------------------------------------------------
+
+; The original's six digits are drawn at columns 14-19 of *both* maps - screen 0
+; for play, screen 1 for the pause screen - after deviation #20 moved them one
+; cell right into the spare column. That leaves column 13 for the seventh digit,
+; and the number stays put when it passes a million instead of shifting.
+DEF SCORE_CELL_FIRST EQU _SCRN0 + $6d       ; row 3, column 13 - ours alone
+DEF SCREEN1_OFFSET   EQU 4                  ; $9800 -> $9C00, in the high byte
+
+LabDrawScoreCarry::
+	ldh  a, [hGameType]
+	cp   GAME_TYPE_A_TYPE
+	ret  nz                         ; B-type has no score panel
+
+	ld   a, [wLabScoreMillions]
+	and  a
+	jr   nz, .carried
+
+; Back under a million: the original owns 14-19, so only our own column needs
+; clearing.
+	ld   a, [wLabScoreCarryDrawn]
+	and  a
+	jr   z, .checkInitialZero
+	xor  a
+	ld   [wLabScoreCarryDrawn], a
+	ld   hl, SCORE_CELL_FIRST
+	ld   a, TILE_EMPTY
+	jp   LabPutBothMaps
+
+; The zero showing at the start of a game is not drawn - it comes from the
+; layout, which puts it where the score used to end, at column 18. Nothing
+; redraws the score until it changes, so it would sit one cell left of every
+; digit that follows it. Move it the first time round; once the score has been
+; drawn, column 19 is never empty again.
+.checkInitialZero:
+	ld   a, [SCORE_CELL_FIRST + 6]  ; column 19
+	cp   TILE_EMPTY
+	ret  nz
+
+	ld   hl, SCORE_CELL_FIRST + 5   ; column 18, where the layout left it
+	ld   a, TILE_EMPTY
+	call LabPutBothMaps
+	inc  hl
+	ld   a, TILE_0
+	jp   LabPutBothMaps
+
+; Past a million the original's draw is wrong, not just short: it blanks leading
+; zeros, so 1 000 350 would read as "350". Draw all seven, zeros and all.
+;
+; A frame behind - this hook runs in front of the handler that redraws the score
+; - so a change shows six digits for one frame before the seven appear.
+.carried:
+	ld   [wLabScoreCarryDrawn], a
+	ld   hl, SCORE_CELL_FIRST
+	and  $0f
+	call LabPutBothMaps
+	inc  hl
+
+	ld   de, wScoreBCD + 2          ; BCD, most significant byte last
+	ld   c, 3
+
+.nextByte:
+	ld   a, [de]
+	push af
+	swap a
+	and  $0f
+	call LabPutBothMaps             ; high nibble
+	inc  hl
+	pop  af
+	and  $0f
+	call LabPutBothMaps             ; low nibble
+	inc  hl
+	dec  de
+	dec  c
+	jr   nz, .nextByte
+	ret
+
+
+; A = tile, HL = a cell in screen 0. Writes it to screen 1 as well, so the score
+; is still right when the pause screen swaps the maps over. Leaves A and HL as
+; it found them.
+LabPutBothMaps::
+	ld   b, a                       ; StoreAinHLwhenLCDFree clobbers A while it
+	call LabPutTile                 ; waits, so the tile has to be kept in B -
+	ld   a, h                       ; LabPutTile preserves BC
+	add  SCREEN1_OFFSET
+	ld   h, a
+	ld   a, b
+	call LabPutTile
+	ld   a, h
+	sub  SCREEN1_OFFSET
+	ld   h, a
 	ret
 
 

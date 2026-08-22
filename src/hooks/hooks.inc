@@ -93,6 +93,28 @@
 ;                                            reaches, sent back to the menu so
 ;                                            the A-TYPE/B-TYPE screen the menu
 ;                                            replaced is never drawn.
+;   HOOK_SCORE_CELLS  $01E8, $01F2,       4  The score is drawn one cell right,
+;                     $23AD, $23C6           so its units digit lands in the
+;                                            spare column 19 instead of leaving
+;                                            it blank. Frees column 13 for the
+;                                            seventh digit, and stops the number
+;                                            shifting sideways when it passes a
+;                                            million. One byte of the operand at
+;                                            each of the four places the score
+;                                            is drawn - screens 0 and 1, twice.
+;   HOOK_SCORE_CAP    $0178-$017A         3  The clamp that pins the score at
+;                                            999 999, replaced by a jump to a
+;                                            carry handler. Three BCD bytes hold
+;                                            six digits and the clamp stops them
+;                                            wrapping to zero - it is the ceiling
+;                                            of the storage, not a rule. The
+;                                            three bytes after it are left as
+;                                            they were and are unreachable.
+;   LAB_BANK1_GFX     $7FF6-$7FFF        10  LabLoadMenuGfx, in the gap after
+;                                            the sound thunks at the very end of
+;                                            bank 1. Split from the section
+;                                            below because neither gap is big
+;                                            enough for both.
 ;   LAB_BANK1_THUNK   $6430-$644F        32  LoadAsciiAndMenuScreenGfx is in
 ;                                            bank 0 but reads Gfx_Ascii from
 ;                                            bank 1, so it cannot be called
