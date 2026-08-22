@@ -13,3 +13,4 @@ choice would otherwise have to be re-derived — or, worse, silently reversed.
 | [6](0006-high-scores-for-levels-a-to-m.md) | High scores for A–M continue the original's table |
 | [7](0007-lab-menu-mirrors-tetrisgym.md) | The Lab menu is TetrisGYM's list, on the screen the game already had |
 | [8](0008-retire-the-hook-count-budget.md) | The hook count is not the budget; the diff test is |
+| [9](0009-entering-an-original-routine-partway.md) | Entering an original routine partway, when its entry point is a register contract |

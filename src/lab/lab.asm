@@ -117,7 +117,20 @@ wLabScoreMillions::  db
 ; What the seventh-digit cell currently shows, so it is only repainted on change.
 wLabScoreCarryDrawn:: db
 
-	ds 1005
+; Whether the zero the layout draws at the start of a game has been moved into
+; the cell the score now ends in. A flag rather than a look at what is on
+; screen: this runs from the gameplay hook, not VBlank, and a VRAM read there
+; returns $FF whenever the PPU happens to be using it.
+wLabScoreZeroMoved:: db
+
+; The seventh digit of each stored high score. The original's entries are three
+; BCD bytes - six digits - so an uncapped score has nowhere to keep its
+; millions, and worse, cannot be ranked against one that has them. Three per
+; level, in the same order as the entries they belong to, shifted alongside
+; them. See LabFileHighScore.
+wLabHiScoreMillions:: ds (MAX_LEVEL + 1) * 3
+
+	ds 936
 wLabStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -213,6 +226,7 @@ LabDispatch::
 	ret
 
 .runNameEntry:
+	call LabRedrawHiScoreMillions   ; the score is on screen while the name is typed
 	ld   hl, GameState15_EnteringHighScore
 	ret
 
@@ -223,6 +237,7 @@ LabDispatch::
 	xor  a
 	ld   [wLabScoreMillions], a     ; the original clears its three bytes here too
 	ld   [wLabScoreCarryDrawn], a
+	ld   [wLabScoreZeroMoved], a
 	call LabArmSeed
 	call LabArmDrill
 	ld   hl, GameState0a_InGameInit
@@ -364,6 +379,12 @@ DEF FOCUS_LEVEL   EQU 1
 
 
 LabLevelSelectInit::
+; File the score first, while hATypeLevel still says the level that was played.
+; Ours rather than the original's, because a seventh digit changes the ranking.
+; It leaves wScoreBCD zeroed either way, so the original's own call a moment
+; later finds nothing and cannot file the same game twice.
+	call LabFileHighScore
+
 ; hATypeLevel may hold a level above the grid, set last time a game started.
 	ldh  a, [hATypeLevel]
 	cp   GRID_LAST + 1
@@ -379,13 +400,6 @@ LabLevelSelectInit::
 	ld   [wLabPickerLevel], a
 	ld   a, FOCUS_LEVEL
 	ld   [wLabFocus], a
-
-; A game just ended above the grid, and the original's init - which runs next -
-; files the score under whatever hATypeLevel says at that moment. It is about to
-; say GRID_LAST, so file the score here instead, while it still says the level
-; that was played. The routine clears wScoreBCD on its way out, so the
-; original's own call finds a zero score and cannot file it a second time.
-	call DisplayATypeHighScoresForLevel
 
 	ld   a, GRID_LAST
 	ldh  [hATypeLevel], a           ; keep the grid cursor somewhere valid
@@ -680,32 +694,296 @@ LabBlankIfFocused::
 LabUpdateHighScores::
 	call DisplayDottedLinesForHighScore
 
+	call LabHiScoreLevel
+	call LabHiScoreSlot
+	push hl                         ; the seventh digits
+	push de                         ; the entries
+	call SetNewHighScoreIfAchieved_SendNameAndScoreToRamBuffer
+	pop  de
+	pop  hl
+	jp   LabDrawHiScoreMillions
+
+
+; The original blanks leading zeros, so an entry past a million reads as its
+; last digits alone - 1 000 544 as "544". Redraw those rows whole, all seven
+; digits, starting in the second of the two dotted cells the original leaves
+; between the name and the score.
+;
+; hl = the row's seventh digit, de = its entry's high byte.
+;
+; This writes to wGameScreenBuffer, not VRAM, so unlike the in-game score it
+; needs no wait for the LCD - the original copies the buffer up in its own time.
+; ---------------------------------------------------------------------------
+; High scores past a million
+;
+; Entries are three BCD bytes - six digits - so an uncapped score has nowhere
+; to keep its seventh digit, and worse, cannot be ranked against one that has
+; one: 1 000 050 stored as 000050 loses to 999 999. The seventh digits live in
+; wLabHiScoreMillions, one per entry, shifted alongside the entries they
+; belong to.
+;
+; Only the comparison is ours. The original's compare falls into
+; .currScoreHigherThanAHighScore with c holding the rank, and that entry point
+; discards the de it pops - it reloads the slot address from HRAM on the very
+; next instruction - so it can be entered from outside with any word on the
+; stack. Everything past it stays the original's: the shift, the dotted name,
+; the song, the display buffer.
+; ---------------------------------------------------------------------------
+
+LabFileHighScore::
+	ldh  a, [hATypeLevel]
+	call LabHiScoreSlot
+	ld   a, d
+	ldh  [h1stHighScoreHighestByteForLevel], a
+	ld   a, e
+	ldh  [h1stHighScoreHighestByteForLevel+1], a
+
+	push hl                         ; the seventh digits, wanted again on a place
+	ld   c, 3                       ; the original's rank: 3 beats 1st, 1 beats 3rd
+
+.nextEntry:
+	call .beatsEntry
+	and  a
+	jr   nz, .placed
+	inc  hl
+	inc  de
+	inc  de
+	inc  de
+	dec  c
+	jr   nz, .nextEntry
+
+; Did not place. Leave the original's own call nothing to disagree with.
+	pop  hl
+	xor  a
+	ld   [wScoreBCD], a
+	ld   [wScoreBCD + 1], a
+	ld   [wScoreBCD + 2], a
+	ld   [wLabScoreMillions], a
+	ret
+
+.placed:
+	pop  hl                         ; the level's first seventh digit
+	ld   a, 3
+	sub  c                          ; the entry we displace, 0-2
+	push bc
+	ld   b, a
+
+; Shift the ones below it down, from the bottom up, alongside the scores and
+; names the original is about to shift.
+	ld   a, 2
+	sub  b
+	jr   z, .storeMillions
+
+	ld   c, a
+	push hl
+	inc  hl
+	inc  hl                         ; the last, which is overwritten first
+
+.shiftDown:
+	dec  hl
+	ld   a, [hl+]
+	ld   [hl], a
+	dec  hl
+	dec  c
+	jr   nz, .shiftDown
+	pop  hl
+
+.storeMillions:
+	ld   c, b
+	ld   b, 0
+	add  hl, bc
+	ld   a, [wLabScoreMillions]
+	ld   [hl], a
+
+	xor  a                          ; the original clears the score it just
+	ld   [wLabScoreMillions], a     ; filed; the seventh digit goes with it
+
+	pop  bc                         ; the rank again
+	push de                         ; the entry point pops a word and drops it
+	jp   SetNewHighScoreIfAchieved_SendNameAndScoreToRamBuffer.currScoreHigherThanAHighScore
+
+; Returns a = 1 if the score just played beats the entry at de (its high byte)
+; and hl (its seventh digit). Preserves both.
+.beatsEntry:
+	push hl
+	push de
+	push bc
+	ld   a, [hl]
+	ld   b, a
+	ld   a, [wLabScoreMillions]
+	cp   b
+	jr   c, .lost
+	jr   nz, .won
+
+	ld   hl, wScoreBCD + 2
+	ld   b, 3
+
+.nextByte:
+	ld   a, [de]
+	sub  [hl]
+	jr   c, .won                    ; the entry is the smaller
+	jr   nz, .lost
+	dec  l
+	dec  de
+	dec  b
+	jr   nz, .nextByte
+	                                ; every digit equal is not better
+
+.lost:
+	pop  bc
+	pop  de
+	pop  hl
+	xor  a
+	ret
+
+.won:
+	pop  bc
+	pop  de
+	pop  hl
+	ld   a, 1
+	ret
+
+
+; The level whose high scores are on screen. The grid cursor is the level while
+; it has focus; above the grid it is the picker, and hATypeLevel has been parked
+; on the last grid cell to keep that cursor somewhere valid.
+LabHiScoreLevel::
 	ld   a, [wLabFocus]
 	and  a
 	jr   nz, .fromPicker
-	ldh  a, [hATypeLevel]           ; grid focus: the cursor is the level
-	jr   .haveLevel
+	ldh  a, [hATypeLevel]
+	ret
 
 .fromPicker:
 	ld   a, [wLabPickerLevel]
+	ret
 
-.haveLevel:
-	ld   hl, wATypeHighScores
-	ld   de, HISCORE_SIZEOF
 
-.nextSlot:
+; Redraw only the seventh digits, leaving the rest of the buffer alone. The name
+; entry screen shares these rows, and refilling them there would wipe the name
+; being typed.
+LabRedrawHiScoreMillions::
+	call LabHiScoreLevel
+	call LabHiScoreSlot
+	jp   LabDrawHiScoreMillions
+
+
+; a = a level. Returns de = its first score's high byte, exactly as $1798
+; computes it, and hl = the first of its three seventh digits.
+LabHiScoreSlot::
+	push af
+	ld   hl, wATypeHighScores + 2
+	ld   bc, HISCORE_SIZEOF
+
+.toSlot:
 	and  a
-	jr   z, .foundSlot
+	jr   z, .found
 	dec  a
-	add  hl, de
-	jr   .nextSlot
+	add  hl, bc
+	jr   .toSlot
 
-.foundSlot:
-	inc  hl                         ; highest byte of score 1
-	inc  hl
+.found:
 	ld   d, h
 	ld   e, l
-	jp   SetNewHighScoreIfAchieved_SendNameAndScoreToRamBuffer
+	pop  af
+	ld   hl, wLabHiScoreMillions
+	ld   c, a
+	ld   b, 0
+	add  hl, bc
+	add  hl, bc
+	add  hl, bc
+	ret
+
+
+LabDrawHiScoreMillions::
+	ld   bc, wGameScreenBuffer + $1a4 + 7
+	ld   a, 3
+
+.nextRow:
+	push af                         ; rows left
+	ld   a, [hl]
+	and  a                          ; Z if this entry never passed a million
+	push hl
+	push de
+	push bc
+	push af                         ; the digit, and whether there is one
+
+	call nz, .drawRow               ; the seven digits, into the buffer
+
+	pop  af
+	pop  hl                         ; the buffer cell
+	push hl
+	jr   nz, .rowToScreen
+
+	ld   a, TILE_BLANK              ; no digit, and nothing left from before
+	ld   [hl], a
+	ld   c, 1
+	jr   .toScreen
+
+.rowToScreen:
+	ld   c, 7
+
+.toScreen:
+	call .cellsToScreen
+
+	pop  bc
+	ld   a, c                       ; down one row of the buffer
+	add  GB_TILE_WIDTH
+	ld   c, a
+	jr   nc, .noCarry
+	inc  b
+
+.noCarry:
+	pop  de
+	pop  hl
+	inc  hl                         ; the next row's seventh digit
+	inc  de                         ; and its entry
+	inc  de
+	inc  de
+	pop  af
+	dec  a
+	jr   nz, .nextRow
+	ret
+
+; a = the seventh digit, de = the entry's high byte, bc = where it goes.
+.drawRow:
+	push bc
+	pop  hl
+	ld   [hl+], a
+	ld   c, 3
+
+.nextByte:
+	ld   a, [de]
+	push af
+	swap a
+	and  $0f
+	ld   [hl+], a
+	pop  af
+	and  $0f
+	ld   [hl+], a
+	dec  de
+	dec  c
+	jr   nz, .nextByte
+	ret
+
+; hl = the first buffer cell, c = how many.
+;
+; The original sends the names and the scores up as two separate blits and
+; never touches the cells between them, and the copy that would carry the rest
+; has already run by the time we get here. So this row goes by hand. Writing
+; only the buffer leaves it on screen exactly as the player reported it:
+; 1 000 257 shown as 257.
+.cellsToScreen:
+	ld   a, [hl]
+	push hl
+	ld   de, _SCRN0 - wGameScreenBuffer
+	add  hl, de
+	call LabPutTile                 ; preserves bc, so c survives the loop
+	pop  hl
+	inc  hl
+	dec  c
+	jr   nz, .cellsToScreen
+	ret
 
 
 
@@ -1459,12 +1737,13 @@ LabDrawScoreCarry::
 ; The zero showing at the start of a game is not drawn - it comes from the
 ; layout, which puts it where the score used to end, at column 18. Nothing
 ; redraws the score until it changes, so it would sit one cell left of every
-; digit that follows it. Move it the first time round; once the score has been
-; drawn, column 19 is never empty again.
+; digit that follows it. Move it once, on the first frame of the game.
 .checkInitialZero:
-	ld   a, [SCORE_CELL_FIRST + 6]  ; column 19
-	cp   TILE_EMPTY
+	ld   a, [wLabScoreZeroMoved]
+	and  a
 	ret  nz
+	inc  a
+	ld   [wLabScoreZeroMoved], a
 
 	ld   hl, SCORE_CELL_FIRST + 5   ; column 18, where the layout left it
 	ld   a, TILE_EMPTY

@@ -82,6 +82,7 @@ python3 -m venv .venv
 .venv/bin/python tests/test_sps.py
 .venv/bin/python tests/test_labmenu.py
 .venv/bin/python tests/test_link.py
+.venv/bin/python tests/test_hiscore.py
 ```
 
 The README's screenshots come from the ROM, not from a folder of stale
