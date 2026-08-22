@@ -104,7 +104,13 @@ wGymDrillPending:: db       ; set at game init, consumed on the first game frame
 wGymDrillLevel::  db        ; the level the TRANSITION row is set to
 wGymSeedDigit::   db        ; 0-3 while editing the seed row, else SEED_IDLE
 
-	ds 1009
+; The controller as the player actually held it, before GymSuppressPushdown
+; edits it. Anything that wants to *show* the input - toni asked for an input
+; display - must read this, not the HRAM the game reads.
+wGymButtonsHeld::    db
+wGymButtonsPressed:: db
+
+	ds 1007
 wGymStateEnd::
 
 ; ---------------------------------------------------------------------------
@@ -307,6 +313,7 @@ GymDispatch::
 ; setting them beforehand achieves nothing.
 .inGameMain:
 	call GymDrillApply
+	call GymSuppressPushdown
 	ld   hl, GameState00_InGameMain
 	ret
 
@@ -1342,6 +1349,55 @@ GymDrillDigit:
 .put:
 	call GymPutTile
 	inc  hl
+	ret
+
+
+
+; ---------------------------------------------------------------------------
+; No pushdown at L and M
+;
+; Holding Down moves the piece every three frames whatever the level ($2092).
+; That is a speed-up everywhere the original can reach - gravity is 4 frames or
+; slower up to level 19, and exactly 3 at level 20 - but L and M fall in 2 and 1.
+; There, handing the piece to the pushdown timer makes it *slower*: it hitches
+; rather than accelerates. Measured, tapping Down at M: gaps of 4 frames
+; appearing in a 1-frame fall.
+;
+; Tolstoj: "for the pushdown, make sure L and M do not change their gravity".
+;
+; He skips the acceleration with a conditional jump. We cannot - that needs
+; seven bytes inserted mid-routine and bank 0 has none - so the press is hidden
+; instead, from the per-frame hook, which runs before the original reads it.
+;
+; The drop points go with it. One point per row pushed ($2126) is a reward for
+; pushing, and at L and M there is no push, so there is nothing to reward.
+;
+; Gated on the gravity reload rather than the level: that is the real condition,
+; and hATypeLinesThresholdToPassForNextLevel still holds an A-type value during
+; a B-type game.
+; ---------------------------------------------------------------------------
+
+GymSuppressPushdown::
+; Keep the real thing first, every frame, whether or not it gets edited. What
+; the game reads is a lie from here on, and something will eventually want the
+; truth - toni has already asked for an input display, which at L and M would
+; otherwise show Down as unpressed while the player leans on it.
+	ldh  a, [hButtonsHeld]
+	ld   [wGymButtonsHeld], a
+	ldh  a, [hButtonsPressed]
+	ld   [wGymButtonsPressed], a
+
+	ldh  a, [hNumFramesUntilPiecesMoveDown]
+	cp   2                          ; stored as frames-1, so < 2 means under 3
+	ret  nc
+
+	ldh  a, [hButtonsHeld]
+	res  PADB_DOWN, a
+	ldh  [hButtonsHeld], a
+
+	ldh  a, [hButtonsPressed]
+	res  PADB_DOWN, a
+	ldh  [hButtonsPressed], a
 	ret
 
 

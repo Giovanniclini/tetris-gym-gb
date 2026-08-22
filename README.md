@@ -111,6 +111,10 @@ indicator beside `LEVEL`. They add ten levels of speed, and are withheld above l
 the original computes them as `min(level + 10, 20)`, which past 20 clamps *downward* and would
 make the game slower.
 
+Holding `Down` does nothing at `L` and `M`. Pushdown moves a piece every 3 frames whatever the
+level, and those two fall in 2 and 1 — so it would make them *slower*. No push, so no drop points
+there either.
+
 The `TOP SCORE` panel follows the level you are about to play. `A`–`M` have their own slots.
 
 ### Transition
