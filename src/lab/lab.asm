@@ -120,7 +120,7 @@ wLabStateEnd::
 SECTION "Lab Core", ROMX[$4000], BANK[2]
 
 LabVersion::
-	db "TETRISLABGB 0.2", 0
+	db "TETRISLABGB 0.3", 0
 
 ; Entry point for the Lab, reached via FarCall with b = BANK(LabInit).
 ; Does nothing yet: Milestone 0.5 expands the cartridge, it does not add
