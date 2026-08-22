@@ -14,11 +14,38 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.emu import Tetris, hIsHardMode, hNumFramesUntilPiecesMoveDown  # noqa: E402
+from tools.emu import Tetris, sym, hIsHardMode, hNumFramesUntilPiecesMoveDown  # noqa: E402
 
 # docs/research.md 2.1 - frames per row for levels 0..20
 GRAVITY = [53, 49, 45, 41, 37, 33, 28, 22, 17, 11,
            10, 9, 8, 7, 6, 6, 5, 5, 4, 4, 3]
+
+
+ROCKETS = {0x58: "big", 0x59: "medium", 0x5A: "small"}
+GS_GAME_OVER_CLEARING, GS_PRE_ROCKET_WAIT = 0x0D, 0x34
+hATypeRocketSpecIdx = 0xFFF3
+
+
+def rocket_for(score):
+    """Finish a game worth `score` and report which rocket it earns, if any."""
+    def bcd(n):
+        d = f"{n % 1000000:06d}"
+        return [int(d[4:6], 16), int(d[2:4], 16), int(d[0:2], 16)]
+
+    with Tetris("build/tetrislab.gb") as t:
+        t.start_game_at(9)
+        t.tick(120)
+        for i, byte in enumerate(bcd(score)):
+            t.pb.memory[0xC0A0 + i] = byte
+        t.pb.memory[sym("wLabScoreMillions")] = score // 1000000
+        t.pb.memory[0xFFE1] = GS_GAME_OVER_CLEARING
+        for _ in range(400):
+            t.tick(1)
+            if t.state == GS_PRE_ROCKET_WAIT:
+                return ROCKETS.get(t[hATypeRocketSpecIdx])
+            if t.state == 0x04:                  # the plain game over screen
+                return None
+    return None
 
 
 def test_gravity_matches_table_for_every_level():
@@ -218,6 +245,28 @@ def test_the_score_passes_999999():
                 f"{[hex(c) for c in cells]}"
             )
         assert t[0x9800 + 3 * 32 + 12] == 0x7B, "the score box border was overwritten"
+
+
+def test_the_rocket_still_fires_at_the_original_thresholds():
+    """The original picks a rocket from the top of the three score bytes: $20,
+    $15 and $10 - 200 000, 150 000, 100 000 ($1F58). None of those move."""
+    for score, want in (
+        (99999, None), (100000, "small"), (149999, "small"),
+        (150000, "medium"), (199999, "medium"), (200000, "big"),
+        (999999, "big"),
+    ):
+        assert rocket_for(score) == want, (
+            f"{score} got {rocket_for(score)}, expected {want}"
+        )
+
+
+def test_a_million_gets_the_big_rocket():
+    """Past a million the three bytes have wrapped to 00 00 00, so the biggest
+    score in the game got no rocket at all while 999 999 got the big one."""
+    for score in (1000000, 1000257, 9999999):
+        assert rocket_for(score) == "big", (
+            f"{score} got {rocket_for(score)}, expected the big rocket"
+        )
 
 
 def test_the_score_is_right_aligned_in_the_spare_cell():

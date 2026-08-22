@@ -212,6 +212,12 @@ LabDispatch::
 	ret
 
 .runLevelEnded:
+	call LabRocketPastAMillion
+	jr   z, .noRocket
+	ld   hl, Stub_148c              ; the rocket takes it from here
+	ret
+
+.noRocket:
 	ld   hl, GameState04_LevelEndedMain
 	ret
 
@@ -691,6 +697,41 @@ LabBlankIfFocused::
 ; instead would be shorter, but the routine below busy-waits on the LCD and so
 ; can outlast a frame - leaving the borrowed value visible to everything else
 ; that runs in between.
+; ---------------------------------------------------------------------------
+; The rocket, past a million
+;
+; The original picks a rocket by reading the top of the three score bytes and
+; comparing it with $20, $15 and $10 - 200 000, 150 000, 100 000 ($1F58). Past
+; a million those bytes have wrapped to 00 00 00, so the biggest score in the
+; game got no rocket at all while 999 999 got the big one.
+;
+; This state is only reached when the original decided against a rocket, so a
+; seventh digit here means it decided wrongly - and a million is past every
+; threshold, so it is always the big one. Setting the same three values the
+; original sets and handing over is the whole fix.
+;
+; Returns Z when there is nothing to do.
+; ---------------------------------------------------------------------------
+
+LabRocketPastAMillion::
+	ldh  a, [hGameType]
+	cp   GAME_TYPE_A_TYPE
+	ret  nz                         ; B-type has its own ending, and cannot
+	                                ; reach a million in 25 lines anyway
+	ld   a, [wLabScoreMillions]
+	and  a
+	ret  z
+
+	ld   a, SPRITE_SPEC_BIG_ROCKET
+	ldh  [hATypeRocketSpecIdx], a
+	ld   a, $90                     ; the same wait the original gives it
+	ldh  [hTimer1], a
+	ld   a, GS_PRE_ROCKET_SCENE_WAIT
+	ldh  [hGameState], a
+	or   a                          ; $34, so never Z
+	ret
+
+
 LabUpdateHighScores::
 	call DisplayDottedLinesForHighScore
 

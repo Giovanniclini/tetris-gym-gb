@@ -139,6 +139,53 @@ def test_a_six_digit_entry_still_reads_as_the_original_drew_it():
         assert row[11:14] == [4, 0, 0], f"the score itself moved: {row}"
 
 
+def test_a_trainer_gets_the_uncap_without_asking_for_it():
+    """The uncap sits on the shared score path, not on any mode, so a trainer
+    inherits it by launching as an A-type game and does nothing else.
+
+    The carry hooks AddScoreValueDEontoBaseScoreHL, which every score add goes
+    through, and keys on the address wScoreBCD+2 rather than the game type. The
+    display and the filing gate on hGameType, which trainers set to A-type. If a
+    future trainer ever has to register itself with the uncap, this test is
+    where that shows up.
+    """
+    sys.path.insert(0, str(ROOT / "tests"))
+    from test_labmenu import to_menu_row
+
+    MODE_TETRIS, MODE_TRANSITION = 0, 3
+    results = {}
+    for name, mode in (("TETRIS", MODE_TETRIS), ("TRANSITION", MODE_TRANSITION)):
+        with Tetris(ROM) as t:
+            to_menu_row(t, mode)
+            t.press("start")
+            if mode == MODE_TETRIS:              # goes via the level select
+                t.run_until_state(0x11)
+                t.tick(10)
+                t.press("start")
+            t.run_until_state(0x00)
+            t.tick(150)
+            for i, byte in enumerate(bcd(257)):
+                t.pb.memory[wScoreBCD + i] = byte
+            t.pb.memory[wLabScoreMillions] = 1   # 1 000 257
+            t.tick(60)
+            level = t[hATypeLevel]
+            panel = [t[0x9800 + 3 * 32 + c] for c in range(13, 20)]
+            t.pb.memory[0xFFE1] = GS_A_TYPE_SELECTION_INIT
+            t.tick(120)
+            results[name] = (panel, entries(t, level)[0],
+                             [t[ROW_VRAM + SEVENTH + i] for i in range(7)])
+
+    assert results["TRANSITION"] == results["TETRIS"], (
+        f"the trainer differs from a plain game:\n"
+        f"  TETRIS     {results['TETRIS']}\n"
+        f"  TRANSITION {results['TRANSITION']}"
+    )
+    panel, filed, shown = results["TRANSITION"]
+    assert panel == [1, 0, 0, 0, 2, 5, 7], panel
+    assert filed == 1000257, filed
+    assert shown == [1, 0, 0, 0, 2, 5, 7], shown
+
+
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
 
 if __name__ == "__main__":
