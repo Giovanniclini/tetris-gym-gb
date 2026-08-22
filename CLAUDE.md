@@ -6,8 +6,12 @@ Read this before doing anything substantial in this repository.
 
 ## What this project is
 
-**tetris-gym-gb is a TetrisGYM-style training/practice ROM for the original Nintendo Game Boy
-version of Tetris (1989).**
+**Tetris Lab GB (`tetris-lab-gb`) is a training/practice ROM for the original Nintendo Game Boy
+version of Tetris (1989), modelled on TetrisGYM for the NES.**
+
+Renamed from `tetris-gym-gb` in August 2026 at TetrisGYM's author's request. **Do not reintroduce
+"gym" into the name, the ROM title, or user-facing text.** References to TetrisGYM itself are
+correct and should stay.
 
 It is modelled on [TetrisGYM](https://github.com/kirjavascript/TetrisGYM) for NES Tetris: a practice
 mod built **on top of a disassembly of the original game**, distributed as a patch, that adds
@@ -23,13 +27,13 @@ It is **not** a new Tetris implementation, and **not** a modernisation.
 | --- | --- |
 | `docs/research.md` | Technical research: TetrisGYM analysis, Game Boy Tetris internals, disassembly evaluation and **local build verification**, hardware constraints, the ROM-hack-vs-rewrite decision, legal/distribution notes |
 | `docs/community-research.md` | Community research, evidence strength, the full feature matrix, and the **TOP 10 features** |
-| `docs/architecture.md` | Current architecture decisions (D1–D8), repository layout, the original/Gym code boundary, memory plan, build system, testing strategy |
+| `docs/architecture.md` | Current architecture decisions (D1–D8), repository layout, the original/Lab code boundary, memory plan, build system, testing strategy |
 | `docs/roadmap.md` | Current milestones and acceptance criteria |
 | `docs/existing-hacks.md` | Reverse engineering of the community's ROM hacks — KLM's extended gravity table, the SPS LFSR, what we must match |
-| `docs/decisions/` | Architecture Decision Records — **read these before touching Gym code**; they record constraints found the hard way (bank switching, hook style, level-select gotchas) |
+| `docs/decisions/` | Architecture Decision Records — **read these before touching Lab code**; they record constraints found the hard way (bank switching, hook style, level-select gotchas) |
 
 **If a task touches architecture, memory layout, the build, the ROM version, or the
-original/Gym boundary, read the relevant document first.** These documents contain measured facts
+original/Lab boundary, read the relevant document first.** These documents contain measured facts
 (free-space figures, verified hashes, exact frame timings) that are expensive to re-derive and easy
 to get wrong from memory.
 
@@ -68,11 +72,11 @@ a randomizer.** They already exist, in the ROM, correct.
 
 If you ever believe a rewrite is warranted, **stop and ask the user.** Do not begin one.
 
-### 3. The original/Gym boundary is sacred
+### 3. The original/Lab boundary is sacred
 
 * `src/original/` is **vendored, not forked**. Every deviation from upstream is enumerated in
   `src/original/UPSTREAM.md`.
-* All new functionality lives in `src/gym/` (ROM banks 2+).
+* All new functionality lives in `src/lab/` (ROM banks 2+).
 * The **only** permitted edits to original banks 0–1 are **declared hooks** in `src/hooks/hooks.inc`.
 * **Prefer changing state over changing code.** Most trainers need no hook at all: set up WRAM and
   the tilemap before gameplay starts, then let the untouched original code run. A hook is the
@@ -173,7 +177,7 @@ Measured, not guessed (`docs/research.md` §4):
 * The original 32 KB ROM has **~400 usable free bytes**. Everything new goes in banks 2+.
 * **HRAM has 2 free bytes.** WRAM has ~4.5 KB free. Use WRAM.
 * **VBlank (~1.09 ms) is the scarcest resource**, and the original handler is already near-full.
-  All Gym rendering goes through one hook and a dirty-flag queue with a per-frame tile budget.
+  All Lab rendering goes through one hook and a dirty-flag queue with a per-frame tile budget.
   Never do arithmetic in VBlank. Prefer sprites for small indicators.
 * Rendering that cannot fit the budget gets redesigned or dropped. It does not get to steal time
   from the original render path, because that would change original timing.

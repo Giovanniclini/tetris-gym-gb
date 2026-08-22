@@ -1,10 +1,15 @@
-# tetris-gym-gb
+# Tetris Lab GB
 
-**A TetrisGYM-style training and practice ROM for the original Nintendo Game Boy Tetris (1989).**
+**A training and practice ROM for the original Nintendo Game Boy Tetris (1989)**, modelled on
+[TetrisGYM](https://github.com/kirjavascript/TetrisGYM) for the NES.
+
+> Renamed from `tetris-gym-gb` in August 2026, at the request of TetrisGYM's author, relayed by
+> Tolstoj — two projects with the same name in the same scene would only confuse people. The old
+> URL still redirects.
 
 > **Status:** see [`docs/roadmap.md`](docs/roadmap.md).
-> Working today: the Gym menu, level select up to M, hearts, the transition trainer, SPS and instant restart.
-> [**Get v0.2.0**](https://github.com/Giovanniclini/tetris-gym-gb/releases) — or see
+> Working today: the Lab menu, level select up to M, hearts, the transition trainer, SPS and instant restart.
+> [**Get v0.2.0**](https://github.com/Giovanniclini/tetris-lab-gb/releases) — or see
 > [Play it](#play-it).
 
 ---
@@ -54,22 +59,22 @@ does not need competition.
 You need your own copy of **`Tetris (World) (Rev A)`** — md5
 `982ed5d2b12a0377eb14bcdc4123744e`. This project never distributes ROM data.
 
-Download `tetrisgym.bps` from
-[Releases](https://github.com/Giovanniclini/tetris-gym-gb/releases), then apply it:
+Download `tetrislab.bps` from
+[Releases](https://github.com/Giovanniclini/tetris-lab-gb/releases), then apply it:
 
 ```
-python3 tools/patch.py tetrisgym.bps "Tetris (World) (Rev A).gb"
+python3 tools/patch.py tetrislab.bps "Tetris (World) (Rev A).gb"
 ```
 
-That writes `tetrisgym.gb`. Any BPS patcher works too (Floating IPS, beat, Rom Patcher JS);
+That writes `tetrislab.gb`. Any BPS patcher works too (Floating IPS, beat, Rom Patcher JS);
 the script is here so you need nothing but Python 3.
 
 Or build it from source — no ROM required, since the ROM is rebuilt from the disassembly:
 
 ```
-git clone https://github.com/Giovanniclini/tetris-gym-gb
-cd tetris-gym-gb
-python3 build.py          # -> build/tetrisgym.gb
+git clone https://github.com/Giovanniclini/tetris-lab-gb
+cd tetris-lab-gb
+python3 build.py          # -> build/tetrislab.gb
 ```
 
 Run it in [SameBoy](https://sameboy.github.io/), BGB, Emulicious or mGBA, or copy it to an
@@ -80,9 +85,9 @@ Game Boy Color*** or the screen is greyscale — see [below](#known-quirk-greysc
 
 | Where | Press | Does |
 | --- | --- | --- |
-| Gym menu | `Up` / `Down` | move between rows |
-| Gym menu | `Left` / `Right` | change the value on the row |
-| Gym menu | `Start` or `A` | launch the mode |
+| Lab menu | `Up` / `Down` | move between rows |
+| Lab menu | `Left` / `Right` | change the value on the row |
+| Lab menu | `Start` or `A` | launch the mode |
 | Level select, grid cell `9` | `Right` | into the level picker |
 | Level picker | `Up` / `Down` | choose `0`–`9` then `A`–`M` |
 | Level select | `Select` | toggle hearts |
@@ -90,9 +95,9 @@ Game Boy Color*** or the screen is greyscale — see [below](#known-quirk-greysc
 
 ## Trainers
 
-![The Gym menu](./assets/screens/menu.png)
+![The Lab menu](./assets/screens/menu.png)
 
-The A-TYPE/B-TYPE screen is the Gym menu, modelled on
+The A-TYPE/B-TYPE screen is the Lab menu, modelled on
 [TetrisGYM's](https://github.com/kirjavascript/TetrisGYM): one list, playable modes first,
 settings after, each row carrying its own value. `Up`/`Down` move, `Left`/`Right` change the
 value on the row, `Start` launches.
@@ -159,7 +164,7 @@ answers.
 
 **Untested on hardware.** Nobody involved has a link cable and no emulator here can carry one, so
 what is verified is that the bytes on the wire are the original's, that the ping never stops, and
-that the fallbacks behave. See [`docs/decisions/0007`](docs/decisions/0007-gym-menu-mirrors-tetrisgym.md).
+that the fallbacks behave. See [`docs/decisions/0007`](docs/decisions/0007-lab-menu-mirrors-tetrisgym.md).
 
 ### Instant restart
 
@@ -193,7 +198,7 @@ An [EverDrive GB](https://krikzz.com/our-products/cartridges/edgbx7.html) or an 
 which load `.gb` files from an SD card. *This is not a restriction this project introduces.* A retail Game Boy Tetris cartridge contains
 **mask ROM** — etched during chip fabrication and physically unwritable. A Game Genie can patch
 cartridge reads at runtime on a genuine cart, but only three codes at a time, which is enough for a
-level-start tweak and nowhere near enough for a Gym. Anything larger needs a flash cart.
+level-start tweak and nowhere near enough for a Lab. Anything larger needs a flash cart.
 
 Our expansion to an MBC1 cartridge (needed because the original 32 KB ROM has only ~400 free bytes)
 therefore costs nothing to emulator, flash-cart, Analogue Pocket or MiSTer users. The only people it

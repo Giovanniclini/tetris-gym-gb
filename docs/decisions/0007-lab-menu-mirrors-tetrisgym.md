@@ -1,4 +1,4 @@
-# 7. The Gym menu is TetrisGYM's list, on the screen the game already had
+# 7. The Lab menu is TetrisGYM's list, on the screen the game already had
 
 **Status:** accepted, 2026-08-21 (Milestone 2)
 
@@ -15,7 +15,7 @@ past `MODE_GAME_QUANTITY`, which is how modes and settings are separated.
 
 ## Decision
 
-**Mirror that list, on the title screen.** The Gym redraws its tilemap and
+**Mirror that list, on the title screen.** The Lab redraws its tilemap and
 handles its own input; the original handler never runs. Two two-byte jump-table
 redirects, nothing shifts: `$07` for the menu and `$24` to skip the copyright
 screen. The A-TYPE/B-TYPE screen and the 8.5-second copyright wait are both
@@ -90,19 +90,19 @@ Moving it meant taking over the rendezvous the title screen was doing: a passive
 ping every frame, and the master's announcement on confirm.
 
 **Both are transcribed byte for byte**, not reimplemented — `tests/test_link.py`
-asserts the original's `$0488` and `$04C5` sequences appear verbatim in the Gym's
+asserts the original's `$0488` and `$04C5` sequences appear verbatim in the Lab's
 banks.
 
 **What can be tested, and what cannot.** PyBoy's serial is a stub (`set_SB`
 hard-codes `$FF`, *"connecting is not implemented yet"*), so no exchange between
-two units can be emulated. Everything the Gym itself does is still checkable, and
+two units can be emulated. Everything the Lab itself does is still checkable, and
 is checked: that it pings every frame with the same `SC` the stock title screen
 does, that a role being assigned hands over to `$2A` with no keypress, that the
 master path starts when a partner is already found, and that with nothing
 attached the wait completes and the menu stays put.
 
 What is left unverified is the physical byte exchange — which happens in
-`SerialInterruptHandler`, original code the Gym does not touch. **Nobody has run
+`SerialInterruptHandler`, original code the Lab does not touch. **Nobody has run
 link play on this ROM on hardware.** That was equally true before this change.
 
 ## Consequences
@@ -134,8 +134,8 @@ link play on this ROM on hardware.** That was equally true before this change.
   the buffer is not obviously a collision structure. The clears in that init are
   transcribed for the same reason: assume any of it is cosmetic at your peril.
 
-  `tests/test_gymmenu.py` asserts those three runs appear **byte for byte** in
-  the Gym's banks, in order and adjacent — the same treatment the serial ping
+  `tests/test_labmenu.py` asserts those three runs appear **byte for byte** in
+  the Lab's banks, in order and adjacent — the same treatment the serial ping
   gets. Deleting the floor again fails that test by name, rather than by hanging
   a game somewhere unrelated.
 * **The menu starts the music the `MUSIC` row is set to.** The screens it
@@ -153,11 +153,11 @@ link play on this ROM on hardware.** That was equally true before this change.
   otherwise draw the A-TYPE/B-TYPE screen the menu replaced.
 * **The line readout must be repainted by hand.** The original only redraws it
   on a line clear, so a drill would otherwise show `000` until the first one.
-* **Every tilemap cell the Gym paints with the LCD on goes through
+* **Every tilemap cell the Lab paints with the LCD on goes through
   `StoreAinHLwhenLCDFree`.** The hardware drops writes made while a line is being
   drawn, and the original's helpers do not guard against it —
   `DisplayBCDNum2CDigits` writes with a bare `ld [hl+], a` because it is only
-  ever called with the LCD idle, so the Gym renders the line count itself rather
+  ever called with the LCD idle, so the Lab renders the line count itself rather
   than calling it.
 
   This cost three bugs that looked unrelated: a menu cursor that vanished at

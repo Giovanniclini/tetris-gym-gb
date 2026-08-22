@@ -61,13 +61,13 @@ PlayNextPieceLoadNextAndHiddenPiece:
     ld   h, $03                                                  ; $2041
 
 .upToDIV:
-; --- tetris-gym-gb deviation #10 (see src/original/UPSTREAM.md) ---
-; SPS. Three bytes for three, so nothing shifts. GymRandom returns the value in
+; --- tetris-lab-gb deviation #10 (see src/original/UPSTREAM.md) ---
+; SPS. Three bytes for three, so nothing shifts. LabRandom returns the value in
 ; B exactly as these two instructions did, and returns rDIV unchanged when SPS
 ; is off. Everything downstream - the counting loop, the OR-rejection retry and
 ; its bias - is untouched.
-IF GYM
-    call GymRandom
+IF LAB
+    call LabRandom
 ELSE
     ldh  a, [rDIV]                                               ; $2043
     ld   b, a                                                    ; $2045
@@ -1046,7 +1046,7 @@ CheckIfATypeNextLevelReached:
 ; ret if at the maximum level
     ld   hl, hATypeLinesThresholdToPassForNextLevel              ; $2454
     ld   a, [hl]                                                 ; $2457
-; --- tetris-gym-gb deviation #4 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #4 (see src/original/UPSTREAM.md) ---
 ; Stock stops levelling only on *equality* with $14, which is correct when 20 is
 ; the highest level there is. Once L and M are selectable it is not: a level 21
 ; start never equals 20, so it keeps climbing and the gravity lookup runs past
@@ -1060,7 +1060,7 @@ CheckIfATypeNextLevelReached:
 ; different from stock. Our first reading of KLM matched the `cp $14` and
 ; assumed the `ret z` after it, and so reported a bug KLM does not have. Tolstoj
 ; said he thought he had fixed it; he had. See docs/existing-hacks.md 3.2.
-IF GYM
+IF LAB
     cp   $14
     ret  nc
 ELSE

@@ -39,7 +39,7 @@ def test_original_rom_is_byte_exact():
 
 
 def test_cartridge_header_is_stock():
-    """Guards the header fields the Gym build will later change (see D5)."""
+    """Guards the header fields the Lab build will later change (see D5)."""
     d = build_original()
     assert d[0x134:0x13B] == b"TETRIS\x00", "title"
     assert d[0x147] == 0x00, "cartridge type must be ROM ONLY in the original build"

@@ -76,14 +76,14 @@ wBTypeHighScores:: ; $d000
 wATypeHighScores:: ; $d654
     ds HISCORE_SIZEOF * 10
 
-; --- tetris-gym-gb deviation #2 (see src/original/UPSTREAM.md) ---
+; --- tetris-lab-gb deviation #2 (see src/original/UPSTREAM.md) ---
 ; The original declares WRAM as a single $C000-$DFFC section, so the linker
 ; cannot see the 2062-byte gap at $D762-$DF6F that the game never touches
 ; (verified: no code anywhere references an address in that range). Splitting
 ; the section here exposes it to the linker without moving a single label.
 ;
 ; WRAM is not part of the ROM image, so this cannot change a byte of output -
-; and `build.py --original` proves it. Unconditional, not guarded by GYM.
+; and `build.py --original` proves it. Unconditional, not guarded by LAB.
 
 SECTION "WRAM Audio", WRAM0[$df70]
 

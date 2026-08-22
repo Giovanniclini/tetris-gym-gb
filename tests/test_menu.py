@@ -3,7 +3,7 @@
 
     .venv/bin/python tests/test_menu.py
 
-The original 0-9 grid is left completely alone. The Gym adds one cell to its
+The original 0-9 grid is left completely alone. The Lab adds one cell to its
 right, reached by pressing Right on cell 9 - a press the original ignores.
 See docs/decisions/0003.
 """
@@ -17,13 +17,13 @@ sys.path.insert(0, str(ROOT))
 from tools.emu import (Tetris, sym, hATypeLevel, hIsHardMode,  # noqa: E402
                        GS_IN_GAME_MAIN)
 
-ROM = "build/tetrisgym.gb"
+ROM = "build/tetrislab.gb"
 
 wScoreBCD = 0xC0A0                              # src/original/include/wram.s
 HISCORE_SIZEOF = 27                             # src/original/include/structs.s
 
-wGymFocus = sym("wGymFocus")
-wGymPickerLevel = sym("wGymPickerLevel")
+wLabFocus = sym("wLabFocus")
+wLabPickerLevel = sym("wLabPickerLevel")
 FOCUS_GRID, FOCUS_LEVEL = 0, 1
 
 GRID_CELLS = ([0x9800 + 6 * 32 + 5 + 2 * i for i in range(5)]
@@ -47,17 +47,17 @@ def open_picker(t):
     while t[hATypeLevel] < 9:
         t.press("right")
     t.press("right")
-    assert t[wGymFocus] == FOCUS_LEVEL, "Right on cell 9 should focus the level field"
+    assert t[wLabFocus] == FOCUS_LEVEL, "Right on cell 9 should focus the level field"
     return t
 
 
 def picker_to(t, level):
     for _ in range(MAX_LEVEL + 1):
-        here = t[wGymPickerLevel]
+        here = t[wLabPickerLevel]
         if here == level:
             return t
         t.press("up" if here < level else "down")
-    raise AssertionError(f"stuck at {t[wGymPickerLevel]} heading for {level}")
+    raise AssertionError(f"stuck at {t[wLabPickerLevel]} heading for {level}")
 
 
 def test_the_original_grid_is_never_modified():
@@ -90,7 +90,7 @@ def test_picker_opens_and_closes_from_the_grid():
         open_picker(t)
         picker_to(t, 12)
         t.press("left")
-        assert t[wGymFocus] == FOCUS_GRID, "focus should have returned to the grid"
+        assert t[wLabFocus] == FOCUS_GRID, "focus should have returned to the grid"
         assert t[hATypeLevel] == 9, "focus should return to grid cell 9"
 
 
@@ -101,11 +101,11 @@ def test_picker_clamps_at_both_ends():
         open_picker(t)
         for _ in range(30):
             t.press("up")
-        assert t[wGymPickerLevel] == MAX_LEVEL, "should stop at M"
+        assert t[wLabPickerLevel] == MAX_LEVEL, "should stop at M"
         for _ in range(30):
             t.press("down")
-        assert t[wGymPickerLevel] == 0, "should stop at 0"
-        assert t[wGymFocus] == FOCUS_LEVEL, "Down at 0 should not leave the field"
+        assert t[wLabPickerLevel] == 0, "should stop at 0"
+        assert t[wLabFocus] == FOCUS_LEVEL, "Down at 0 should not leave the field"
 
 
 def test_picker_cell_shows_the_level_character():
@@ -171,18 +171,18 @@ def test_the_level_field_swallows_up_and_down():
         for direction in ("up", "down", "up"):
             t.press(direction)
             assert t[hATypeLevel] == before, "grid cursor moved under the level field"
-            assert t[wGymFocus] == FOCUS_LEVEL, "focus changed"
+            assert t[wLabFocus] == FOCUS_LEVEL, "focus changed"
 
 
 def test_the_level_field_is_the_only_one_left():
-    """The seed moved to the Gym menu (docs/decisions/0007), so Right on the
+    """The seed moved to the Lab menu (docs/decisions/0007), so Right on the
     level field has nowhere to go and must be swallowed rather than reaching
     the original underneath."""
     with Tetris(ROM) as t:
         open_picker(t)
         before = t[hATypeLevel]
         t.press("right")
-        assert t[wGymFocus] == FOCUS_LEVEL, f"focus left the level field: {t[wGymFocus]}"
+        assert t[wLabFocus] == FOCUS_LEVEL, f"focus left the level field: {t[wLabFocus]}"
         assert t[hATypeLevel] == before, "grid cursor moved under the level field"
 
 
@@ -244,7 +244,7 @@ def test_hearts_are_cleared_above_level_20():
         while t[hATypeLevel] < 9:            # already on the screen; do not renavigate
             t.press("right")
         t.press("right")                     # into the level field
-        assert t[wGymFocus]
+        assert t[wLabFocus]
         picker_to(t, 21)
         t.tick(4)
         assert t[hIsHardMode] == 0, "hearts should be cleared above level 20"
@@ -260,9 +260,9 @@ def test_heart_speeds_are_unchanged_for_the_original_levels():
 
 def test_the_extended_table_continues_the_original_one():
     """The original indexes wATypeHighScores + level * HISCORE_SIZEOF with no
-    bound check. The Gym's slots for A-M are correct only because they sit
+    bound check. The Lab's slots for A-M are correct only because they sit
     exactly where that arithmetic already points."""
-    base, ext = sym("wATypeHighScores"), sym("wGymATypeHighScoresExt")
+    base, ext = sym("wATypeHighScores"), sym("wLabATypeHighScoresExt")
     assert ext == base + 10 * HISCORE_SIZEOF, (
         f"extension at ${ext:04X}, expected ${base + 10 * HISCORE_SIZEOF:04X}"
     )
@@ -270,7 +270,7 @@ def test_the_extended_table_continues_the_original_one():
 
 def test_a_score_is_filed_under_the_level_it_was_played_at():
     """Before the extension the index ran off the end of the ten-slot table and
-    the Gym clamped it back to 9 - so a game at M filed its score under 9, and
+    the Lab clamped it back to 9 - so a game at M filed its score under 9, and
     that is where it showed up. See docs/decisions/0006."""
     score = (0x00, 0x00, 0x11)                             # 110000, in BCD
     with Tetris(ROM) as t:
@@ -295,7 +295,7 @@ def test_a_score_is_filed_under_the_level_it_was_played_at():
 
 
 def test_high_scores_follow_the_picked_level():
-    """The TOP SCORE panel is driven by hATypeLevel, which the Gym keeps as the
+    """The TOP SCORE panel is driven by hATypeLevel, which the Lab keeps as the
     grid index while the level field has focus - so it used to keep showing the
     grid cursor's scores while you had M selected."""
     PANEL = [0x9800 + r * 32 + c for r in (13, 14, 15) for c in range(3, 17)]
@@ -331,13 +331,13 @@ def test_high_scores_follow_the_picked_level():
         t.press("right")                                   # level field, at 10
         assert dots(t) == empty, "A has no score yet; expected placeholders"
 
-        while t[wGymPickerLevel] > 5:
+        while t[wLabPickerLevel] > 5:
             t.press("down")
         assert dots(t) == with_score, (
             "the panel should show level 5's scores when the level field is on 5"
         )
 
-        while t[wGymPickerLevel] < 22:
+        while t[wLabPickerLevel] < 22:
             t.press("up")
         assert dots(t) == with_score, "M has its own slot and should show it"
 

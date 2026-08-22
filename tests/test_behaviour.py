@@ -64,7 +64,7 @@ def test_observed_fall_rate_matches_the_reload_value():
         )
 
 
-def test_gym_build_adds_levels_l_and_m():
+def test_lab_build_adds_levels_l_and_m():
     """L (21) and M (22) must match KLM exactly: 2 and 1 frames per row.
 
     M is the engine's ceiling - the gravity counter cannot reload with less
@@ -72,7 +72,7 @@ def test_gym_build_adds_levels_l_and_m():
     See docs/existing-hacks.md section 3.
     """
     for level, expected in ((21, 2), (22, 1)):
-        with Tetris("build/tetrisgym.gb") as t:
+        with Tetris("build/tetrislab.gb") as t:
             t.start_game_at(level)
             got = t.gravity()
             name = "L" if level == 21 else "M"
@@ -81,16 +81,16 @@ def test_gym_build_adds_levels_l_and_m():
             )
 
 
-def test_gym_build_preserves_every_original_level():
+def test_lab_build_preserves_every_original_level():
     """Adding L and M must not disturb levels 0-20."""
-    with Tetris("build/tetrisgym.gb") as t:
+    with Tetris("build/tetrislab.gb") as t:
         for level in range(21):
             t.start_game_at(level)
             got = t.gravity()
             assert got == GRAVITY[level], (
                 f"level {level}: expected {GRAVITY[level]} frames/row, got {got}"
             )
-            t.__init__("build/tetrisgym.gb")
+            t.__init__("build/tetrislab.gb")
 
 
 PIECE_Y = 0xC201                             # wSpriteSpecs[0].BaseYOffset
@@ -104,7 +104,7 @@ def _fall(level, tap_down, frames=900):
     so a single hold does nothing after the first one.
     """
     import collections
-    with Tetris("build/tetrisgym.gb") as t:
+    with Tetris("build/tetrislab.gb") as t:
         t.start_game_at(level)
         t.tick(60)
         marks, prev = [], t[PIECE_Y]
@@ -152,23 +152,23 @@ def test_the_real_button_state_is_kept_when_down_is_suppressed():
     """Suppressing pushdown works by editing the controller state the game
     reads, so from that point what the game sees is a lie. Anything that wants
     to *show* the input - toni asked for an input display - has to read the
-    unedited copy the Gym keeps."""
+    unedited copy the Lab keeps."""
     from tools.emu import sym
     hButtonsHeld = 0xFF80
-    wGymButtonsHeld = sym("wGymButtonsHeld")
+    wLabButtonsHeld = sym("wLabButtonsHeld")
 
     for level, game_should_see_down in ((9, True), (22, False)):
-        with Tetris("build/tetrisgym.gb") as t:
+        with Tetris("build/tetrislab.gb") as t:
             t.start_game_at(level)
             t.tick(60)
             t.pb.button_press("down")
             t.tick(20)
             seen = bool(t[hButtonsHeld] & 0x80)
-            stashed = bool(t[wGymButtonsHeld] & 0x80)
+            stashed = bool(t[wLabButtonsHeld] & 0x80)
             assert seen == game_should_see_down, (
                 f"level {level}: game sees Down={seen}, expected {game_should_see_down}"
             )
-            assert stashed, f"level {level}: the Gym lost the real button state"
+            assert stashed, f"level {level}: the Lab lost the real button state"
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

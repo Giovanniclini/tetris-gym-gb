@@ -16,13 +16,13 @@ sys.path.insert(0, str(ROOT))
 
 from tools.emu import Tetris, sym, hATypeLevel, GS_IN_GAME_MAIN  # noqa: E402
 
-ROM = "build/tetrisgym.gb"
+ROM = "build/tetrislab.gb"
 
 hCurrPiece = 0xFF92
-wGymRngLo, wGymRngHi = sym("wGymRngLo"), sym("wGymRngHi")
-wGymSeedLo, wGymSeedHi = sym("wGymSeedLo"), sym("wGymSeedHi")
+wLabRngLo, wLabRngHi = sym("wLabRngLo"), sym("wLabRngHi")
+wLabSeedLo, wLabSeedHi = sym("wLabSeedLo"), sym("wLabSeedHi")
 GS_IN_GAME_INIT = 0x0A
-hGymSpsEnabled = 0xFFFE
+hLabSpsEnabled = 0xFFFE
 hHiddenLoadedPiece = 0xFFAE
 rDIV = 0xFF04
 
@@ -50,9 +50,9 @@ def lfsr_step(h, l):
 
 
 def arm(t, seed):
-    t.pb.memory[wGymRngLo] = seed & 0xFF
-    t.pb.memory[wGymRngHi] = seed >> 8
-    t.pb.memory[hGymSpsEnabled] = 1
+    t.pb.memory[wLabRngLo] = seed & 0xFF
+    t.pb.memory[wLabRngHi] = seed >> 8
+    t.pb.memory[hLabSpsEnabled] = 1
 
 
 def piece_sequence(seed, frames=3000):
@@ -99,10 +99,10 @@ def test_the_lfsr_matches_the_community_rom():
         t.start_game_at(9)
         t.tick(30)
         arm(t, seed)
-        seen, last = [], (t[wGymRngHi], t[wGymRngLo])
+        seen, last = [], (t[wLabRngHi], t[wLabRngLo])
         for _ in range(3000):
             t.tick(1)
-            cur = (t[wGymRngHi], t[wGymRngLo])
+            cur = (t[wLabRngHi], t[wLabRngLo])
             if cur != last:
                 seen.append(cur)
                 last = cur
@@ -133,8 +133,8 @@ def test_sps_off_leaves_the_original_generator_alone():
     """
     with Tetris(ROM) as t:
         t.start_game_at(9)
-        assert t[hGymSpsEnabled] == 0, "SPS should default to off"
-        before = (t[wGymRngHi], t[wGymRngLo])
+        assert t[hLabSpsEnabled] == 0, "SPS should default to off"
+        before = (t[wLabRngHi], t[wLabRngLo])
         pieces, last = 0, t[hHiddenLoadedPiece]
         for _ in range(3000):
             t.tick(1)
@@ -143,7 +143,7 @@ def test_sps_off_leaves_the_original_generator_alone():
                 pieces += 1
                 last = v
         assert pieces >= 8, f"only {pieces} pieces drawn; the test proves nothing"
-        assert (t[wGymRngHi], t[wGymRngLo]) == before, (
+        assert (t[wLabRngHi], t[wLabRngLo]) == before, (
             "the LFSR advanced while SPS was off - the rDIV branch is not taken"
         )
 
@@ -163,12 +163,12 @@ def test_a_seed_of_zero_means_no_seed():
 
     with Tetris(ROM) as t:
         t.to_level_select()
-        t.pb.memory[wGymSeedLo] = 0
-        t.pb.memory[wGymSeedHi] = 0
+        t.pb.memory[wLabSeedLo] = 0
+        t.pb.memory[wLabSeedHi] = 0
         t.pb.memory[hATypeLevel] = 9
         t.press("start")
         t.run_until_state(GS_IN_GAME_MAIN)
-        assert t[hGymSpsEnabled] == 0, "a zero seed should leave SPS off"
+        assert t[hLabSpsEnabled] == 0, "a zero seed should leave SPS off"
 
 
 def test_the_seed_is_reloaded_at_the_start_of_every_game():
@@ -178,20 +178,20 @@ def test_the_seed_is_reloaded_at_the_start_of_every_game():
         for _ in range(limit):
             t.tick(1)
             if t.state == GS_IN_GAME_INIT:
-                seen.append((t[wGymRngHi] << 8) | t[wGymRngLo])
+                seen.append((t[wLabRngHi] << 8) | t[wLabRngLo])
                 if len(seen) >= 3:
                     break
         return seen
 
     with Tetris(ROM) as t:
         t.to_level_select()
-        t.pb.memory[wGymSeedLo] = 0xE1
-        t.pb.memory[wGymSeedHi] = 0xAC
+        t.pb.memory[wLabSeedLo] = 0xE1
+        t.pb.memory[wLabSeedHi] = 0xAC
         t.pb.memory[hATypeLevel] = 9
         t.press("start")
         t.run_until_state(GS_IN_GAME_MAIN)
         t.tick(600)
-        mid = (t[wGymRngHi] << 8) | t[wGymRngLo]
+        mid = (t[wLabRngHi] << 8) | t[wLabRngLo]
         assert mid != 0xACE1, "the LFSR should have advanced during play"
 
         for b in ("a", "b", "select", "start"):
@@ -257,7 +257,7 @@ def test_the_same_seed_deals_the_same_sequence_after_a_game():
 
 
 def test_seed_can_be_entered_from_the_menu():
-    """The SEED row of the Gym menu: A opens the digits, Left/Right pick one,
+    """The SEED row of the Lab menu: A opens the digits, Left/Right pick one,
     Up/Down change it. See docs/decisions/0007."""
     with Tetris(ROM) as t:
         t.to_menu()
@@ -271,7 +271,7 @@ def test_seed_can_be_entered_from_the_menu():
         t.press("a")                           # close them
         for _ in range(4):
             t.press("up")                      # back up to TETRIS
-        seed = (t[wGymSeedHi] << 8) | t[wGymSeedLo]
+        seed = (t[wLabSeedHi] << 8) | t[wLabSeedLo]
         assert seed == 0xACE1, f"typed $ACE1, got ${seed:04X}"
 
         t.press("start")                       # TETRIS -> the level select
@@ -279,7 +279,7 @@ def test_seed_can_be_entered_from_the_menu():
         t.tick(6)
         t.press("start")
         t.run_until_state(GS_IN_GAME_MAIN)
-        assert t[hGymSpsEnabled] != 0, "a non-zero seed should arm SPS"
+        assert t[hLabSpsEnabled] != 0, "a non-zero seed should arm SPS"
 
 
 TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

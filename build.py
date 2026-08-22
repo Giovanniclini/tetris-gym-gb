@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build the TetrisGYM-GB ROM.
 
-    python3 build.py               build the Gym ROM       (GYM=1)
-    python3 build.py --original    rebuild the stock ROM   (GYM=0)  <- the regression test
+    python3 build.py               build the Lab ROM       (LAB=1)
+    python3 build.py --original    rebuild the stock ROM   (LAB=0)  <- the regression test
     python3 build.py --freespace   also print per-bank free space
-    python3 build.py --patch       also emit build/tetrisgym.bps for release
+    python3 build.py --patch       also emit build/tetrislab.bps for release
 
 Requires only Python 3 and network access on first run; the pinned RGBDS
 toolchain is fetched into build/toolchain/. Nothing is installed system-wide.
@@ -38,13 +38,13 @@ UNITS = [
     ("hram", SRC / "include" / "hram.s"),
 ]
 
-# Gym translation units, added only when GYM=1.
-GYM_UNITS = [
-    ("gym", ROOT / "src" / "gym" / "gym.asm"),
-    ("gym_random", ROOT / "src" / "gym" / "random.asm"),
+# Lab translation units, added only when LAB=1.
+LAB_UNITS = [
+    ("lab", ROOT / "src" / "lab" / "lab.asm"),
+    ("lab_random", ROOT / "src" / "lab" / "random.asm"),
 ]
 
-# Cartridge header for the Gym build. The stock cartridge is ROM-ONLY with
+# Cartridge header for the Lab build. The stock cartridge is ROM-ONLY with
 # ~51 usable free bytes, so expansion is arithmetic, not preference.
 # See docs/architecture.md D5/D9.
 MBC1_RAM_BATTERY = 0x03
@@ -101,11 +101,11 @@ def freespace(map_path: Path) -> None:
     flush()
 
 
-def build_rom(gym: int, no_sram: bool = False):
+def build_rom(lab: int, no_sram: bool = False):
     """Assemble, link and fix one ROM. Returns (rom path, map path, bytes)."""
-    name = "tetrisgym" if gym else "tetris"
+    name = "tetrislab" if lab else "tetris"
 
-    print(f"TetrisGYM-GB build  (GYM={gym})")
+    print(f"TetrisGYM-GB build  (LAB={lab})")
 
     print("toolchain:")
     tc = rgbds.ensure(BUILD)
@@ -116,11 +116,11 @@ def build_rom(gym: int, no_sram: bool = False):
     print("assemble:")
     OBJ.mkdir(parents=True, exist_ok=True)
     objs = []
-    units = UNITS + (GYM_UNITS if gym else [])
+    units = UNITS + (LAB_UNITS if lab else [])
     for unit, path in units:
         obj = OBJ / f"{unit}.o"
         run([tc / "rgbasm", "-h", "-L", "-E",
-             "-D", f"GYM={gym}",
+             "-D", f"LAB={lab}",
              "-I", str(SRC) + "/", "-I", str(OBJ) + "/",
              "-I", str(ROOT / "src") + "/",
              "-o", obj, path])
@@ -132,7 +132,7 @@ def build_rom(gym: int, no_sram: bool = False):
 
     print("link:")
     run([tc / "rgblink", "-n", sym, "-m", mapf, "-w", "-o", rom, *objs])
-    if gym:
+    if lab:
         mbc = MBC1_NO_RAM if no_sram else MBC1_RAM_BATTERY
         ram = RAM_NONE if no_sram else RAM_8KB
         run([tc / "rgbfix", "-v", "-p", "255",
@@ -149,21 +149,21 @@ def build_rom(gym: int, no_sram: bool = False):
     return rom, mapf, data
 
 
-def emit_patch(gym_rom: bytes) -> int:
+def emit_patch(lab_rom: bytes) -> int:
     """Write the BPS the release ships. The source is our own byte-exact
     rebuild of the stock ROM, so producing a release needs no copy of it."""
     print("\npatch source:")
-    _, _, stock = build_rom(gym=0)
+    _, _, stock = build_rom(lab=0)
     if hashlib.sha1(stock).hexdigest() != REFERENCE_SHA1:
         print("\nFAIL: patch source is not the stock ROM", file=sys.stderr)
         return 1
 
-    bps = patch.create_bps(stock, gym_rom, b"tetris-gym-gb")
-    out = BUILD / "tetrisgym.bps"
+    bps = patch.create_bps(stock, lab_rom, b"tetris-lab-gb")
+    out = BUILD / "tetrislab.bps"
     out.write_bytes(bps)
 
     restored = patch.apply(stock, bps)
-    if restored != gym_rom:
+    if restored != lab_rom:
         print("\nFAIL: the patch does not reproduce the ROM", file=sys.stderr)
         return 1
 
@@ -176,21 +176,21 @@ def emit_patch(gym_rom: bytes) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--original", action="store_true",
-                    help="build with GYM=0: must reproduce the stock ROM byte-exactly")
+                    help="build with LAB=0: must reproduce the stock ROM byte-exactly")
     ap.add_argument("--freespace", action="store_true", help="print per-bank free space")
     ap.add_argument("--no-sram", action="store_true",
                     help="build without cartridge RAM (cheaper board, no persistence)")
     ap.add_argument("--patch", action="store_true",
-                    help="also write build/tetrisgym.bps, the file releases ship")
+                    help="also write build/tetrislab.bps, the file releases ship")
     args = ap.parse_args()
 
     if args.patch and args.original:
-        print("--patch builds the Gym ROM; it cannot be combined with --original",
+        print("--patch builds the Lab ROM; it cannot be combined with --original",
               file=sys.stderr)
         return 2
 
-    gym = 0 if args.original else 1
-    rom, mapf, data = build_rom(gym, args.no_sram)
+    lab = 0 if args.original else 1
+    rom, mapf, data = build_rom(lab, args.no_sram)
 
     if args.freespace:
         freespace(mapf)
